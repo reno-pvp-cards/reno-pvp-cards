@@ -130,58 +130,67 @@ function PlayerCard({ player, theme, onEdit }) {
     if (!cardRef.current) return;
     setSaving(true);
     await document.fonts.ready;
-    await new Promise(r => setTimeout(r, 150));
 
-    // Base64 dataURL → Blob URL に変換（dom-to-image-more が inline画像を描画できない問題の回避）
+    // saving=true でフッターが非表示になった後、DOM更新を待つ
+    await new Promise(r => setTimeout(r, 200));
+
+    // ── Base64 dataURL → Blob URL 変換 ──
+    // imgタグ化により bgDiv.src に直接セットする方式に変更
+    // （background-image + base64 は dom-to-image-more で不安定なため）
     let blobUrl = null;
+    let bgImg = null;
     if (player.screenshotDataUrl) {
       try {
         const res  = await fetch(player.screenshotDataUrl);
         const blob = await res.blob();
         blobUrl = URL.createObjectURL(blob);
-        // カード内の background-image を一時的に Blob URL に差し替え
-        const bgDiv = cardRef.current.querySelector("[data-screenshot]");
-        if (bgDiv) bgDiv.style.backgroundImage = `url(${blobUrl})`;
-        await new Promise(r => setTimeout(r, 100));
+        bgImg = cardRef.current.querySelector("[data-screenshot]");
+        if (bgImg) bgImg.src = blobUrl;
+
+        // imgのload完了を確実に待つ
+        await new Promise((resolve) => {
+          const tmp = new Image();
+          tmp.onload  = resolve;
+          tmp.onerror = resolve; // エラー時も続行
+          tmp.src = blobUrl;
+        });
+        // レンダリング反映まで追加待機
+        await new Promise(r => setTimeout(r, 150));
       } catch(e) {
         console.warn("Blob URL変換失敗、そのまま続行:", e);
       }
     }
 
+    // ── dom-to-image-more でキャプチャ ──
+    // scale オプションで2倍出力（width/height + transform の組み合わせは画像が消える問題あり）
+    // filter は渡さない（一部バージョンで cacheBust と干渉するバグあり）
     let dataURL = null;
     try {
-      dataURL = await domtoimage.toJpeg(cardRef.current, {
-        quality: 0.95,
-        width:  CARD_W * 2,
-        height: CARD_H * 2,
-        style: {
-          transform: "scale(2)",
-          transformOrigin: "top left",
-        },
+      dataURL = await domtoimage.toPng(cardRef.current, {
+        scale: 2,
         cacheBust: true,
-        filter: () => true,
       });
     } catch(e) {
       alert("画像の生成に失敗しました。");
       console.error(e);
     } finally {
-      // Blob URL を解放して元の dataURL に戻す
-      if (blobUrl) {
-        const bgDiv = cardRef.current?.querySelector("[data-screenshot]");
-        if (bgDiv) bgDiv.style.backgroundImage = `url(${player.screenshotDataUrl})`;
+      // Blob URL を解放し、imgのsrcを元の dataURL に戻す
+      if (blobUrl && bgImg) {
+        bgImg.src = player.screenshotDataUrl;
         URL.revokeObjectURL(blobUrl);
       }
+      setSaving(false);
     }
 
-    if (!dataURL) { setSaving(false); return; }
+    if (!dataURL) return;
 
-    const fileName = `cc-card-${fullName||"player"}-${theme}.jpg`;
+    const fileName = `cc-card-${fullName||"player"}-${theme}.png`;
     const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent) && !window.MSStream;
 
     if (isIOS) {
       try {
         const blob = await (await fetch(dataURL)).blob();
-        const file = new File([blob], fileName, { type:"image/jpeg" });
+        const file = new File([blob], fileName, { type:"image/png" });
         if (navigator.canShare && navigator.canShare({ files:[file] })) {
           await navigator.share({ files:[file], title:"CC Player Card" });
         } else {
@@ -195,7 +204,6 @@ function PlayerCard({ player, theme, onEdit }) {
       a.download = fileName; a.href = dataURL;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
-    setSaving(false);
   };
 
   const showFallback = (dataURL) => {
@@ -259,12 +267,16 @@ function PlayerCard({ player, theme, onEdit }) {
           overflow:"hidden", zIndex:0,
         }}>
           {player.screenshotDataUrl ? (
-            <div data-screenshot="true" style={{
-              width:"100%", height:"100%",
-              backgroundImage:`url(${player.screenshotDataUrl})`,
-              backgroundSize:"cover",
-              backgroundPosition:"center",
-            }}/>
+            <img
+              data-screenshot="true"
+              src={player.screenshotDataUrl}
+              alt=""
+              style={{
+                width:"100%", height:"100%",
+                objectFit:"cover",
+                display:"block",
+              }}
+            />
           ) : (
             <div style={{ width:"100%", height:"100%", background:t.screenshotBg }}/>
           )}
