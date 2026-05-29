@@ -142,6 +142,9 @@ function PlayerCard({ player, theme, onEdit }) {
           transform: "scale(2)",
           transformOrigin: "top left",
         },
+        cacheBust: true,
+        imagePlaceholder: undefined,
+        filter: () => true,
       });
     } catch(e) {
       alert("画像の生成に失敗しました。");
