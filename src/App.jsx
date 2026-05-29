@@ -132,9 +132,24 @@ function PlayerCard({ player, theme, onEdit }) {
     await document.fonts.ready;
     await new Promise(r => setTimeout(r, 150));
 
+    // Base64 dataURL → Blob URL に変換（dom-to-image-more が inline画像を描画できない問題の回避）
+    let blobUrl = null;
+    if (player.screenshotDataUrl) {
+      try {
+        const res  = await fetch(player.screenshotDataUrl);
+        const blob = await res.blob();
+        blobUrl = URL.createObjectURL(blob);
+        // カード内の background-image を一時的に Blob URL に差し替え
+        const bgDiv = cardRef.current.querySelector("[data-screenshot]");
+        if (bgDiv) bgDiv.style.backgroundImage = `url(${blobUrl})`;
+        await new Promise(r => setTimeout(r, 100));
+      } catch(e) {
+        console.warn("Blob URL変換失敗、そのまま続行:", e);
+      }
+    }
+
     let dataURL = null;
     try {
-      // dom-to-image-more：ブラウザ描画をそのまま高品質キャプチャ（@2x）
       dataURL = await domtoimage.toPng(cardRef.current, {
         width:  CARD_W * 2,
         height: CARD_H * 2,
@@ -143,12 +158,18 @@ function PlayerCard({ player, theme, onEdit }) {
           transformOrigin: "top left",
         },
         cacheBust: true,
-        imagePlaceholder: undefined,
         filter: () => true,
       });
     } catch(e) {
       alert("画像の生成に失敗しました。");
       console.error(e);
+    } finally {
+      // Blob URL を解放して元の dataURL に戻す
+      if (blobUrl) {
+        const bgDiv = cardRef.current?.querySelector("[data-screenshot]");
+        if (bgDiv) bgDiv.style.backgroundImage = `url(${player.screenshotDataUrl})`;
+        URL.revokeObjectURL(blobUrl);
+      }
     }
 
     if (!dataURL) { setSaving(false); return; }
@@ -237,7 +258,7 @@ function PlayerCard({ player, theme, onEdit }) {
           overflow:"hidden", zIndex:0,
         }}>
           {player.screenshotDataUrl ? (
-            <div style={{
+            <div data-screenshot="true" style={{
               width:"100%", height:"100%",
               backgroundImage:`url(${player.screenshotDataUrl})`,
               backgroundSize:"cover",
