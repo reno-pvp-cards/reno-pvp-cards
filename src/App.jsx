@@ -150,7 +150,8 @@ function PlayerCard({ player, theme, onEdit }) {
 
     let dataURL = null;
     try {
-      dataURL = await domtoimage.toPng(cardRef.current, {
+      dataURL = await domtoimage.toJpeg(cardRef.current, {
+        quality: 0.95,
         width:  CARD_W * 2,
         height: CARD_H * 2,
         style: {
@@ -174,13 +175,13 @@ function PlayerCard({ player, theme, onEdit }) {
 
     if (!dataURL) { setSaving(false); return; }
 
-    const fileName = `cc-card-${fullName||"player"}-${theme}.png`;
+    const fileName = `cc-card-${fullName||"player"}-${theme}.jpg`;
     const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent) && !window.MSStream;
 
     if (isIOS) {
       try {
         const blob = await (await fetch(dataURL)).blob();
-        const file = new File([blob], fileName, { type:"image/png" });
+        const file = new File([blob], fileName, { type:"image/jpeg" });
         if (navigator.canShare && navigator.canShare({ files:[file] })) {
           await navigator.share({ files:[file], title:"CC Player Card" });
         } else {
