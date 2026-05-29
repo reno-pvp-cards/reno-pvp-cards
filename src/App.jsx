@@ -1,11 +1,5 @@
 import React, { useState, useRef } from "react";
-
-// html2canvasをグローバルに読み込む
-if (typeof window !== "undefined" && !window.html2canvas) {
-  const script = document.createElement("script");
-  script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-  document.head.appendChild(script);
-}
+import domtoimage from "dom-to-image-more";
 
 const JOB_LIST = [
   "ナイト","戦士","暗黒騎士","ガンブレイカー",
@@ -119,19 +113,6 @@ const emptyPlayer = {
   screenshotDataUrl:"",freeText:"",sns:[],
 };
 
-// objectFit:cover をcanvasで再現
-function buildCroppedCanvas(imgEl, w, h) {
-  const c = document.createElement("canvas");
-  c.width = w; c.height = h;
-  const ctx = c.getContext("2d");
-  const iw = imgEl.naturalWidth, ih = imgEl.naturalHeight;
-  const scale = Math.max(w/iw, h/ih);
-  const sw = w/scale, sh = h/scale;
-  const sx = (iw-sw)/2, sy = (ih-sh)/2;
-  ctx.drawImage(imgEl, sx, sy, sw, sh, 0, 0, w, h);
-  return c;
-}
-
 // ===================== CARD VIEW =====================
 // カードは 420×800px 固定。情報エリアはこの中に収める。
 const CARD_W = 420;
@@ -142,45 +123,29 @@ function PlayerCard({ player, theme, onEdit }) {
   const t = THEMES[theme] || THEMES.dark;
   const rc = t.rankColor(player.highestRank);
   const cardRef = useRef(null);
-  const imgRef  = useRef(null);
   const [saving, setSaving] = useState(false);
   const fullName = [player.firstName, player.lastName].filter(Boolean).join(" ");
 
   const handleSaveImage = async () => {
-    if (!cardRef.current || !window.html2canvas) {
-      alert("画像ライブラリの読み込み中です。数秒後に再度お試しください。");
-      return;
-    }
+    if (!cardRef.current) return;
     setSaving(true);
     await document.fonts.ready;
     await new Promise(r => setTimeout(r, 150));
 
-    // objectFit:cover を canvas で再現して差し替え
-    const originalImg = imgRef.current;
-    let fakeImg = null;
-    if (originalImg && player.screenshotDataUrl) {
-      const cropped = buildCroppedCanvas(originalImg, CARD_W, PHOTO_H);
-      fakeImg = document.createElement("img");
-      fakeImg.src = cropped.toDataURL();
-      fakeImg.style.cssText = `position:absolute;top:0;left:0;width:${CARD_W}px;height:${PHOTO_H}px;object-fit:fill;display:block;z-index:0;`;
-      originalImg.parentNode.replaceChild(fakeImg, originalImg);
-    }
-
     let dataURL = null;
     try {
-      const canvas = await window.html2canvas(cardRef.current, {
-        backgroundColor: t.cardBg,
-        scale: 2, useCORS: true, allowTaint: true, logging: false,
-        width: CARD_W, height: CARD_H,
+      // dom-to-image-more：ブラウザ描画をそのまま高品質キャプチャ（@2x）
+      dataURL = await domtoimage.toPng(cardRef.current, {
+        width:  CARD_W * 2,
+        height: CARD_H * 2,
+        style: {
+          transform: "scale(2)",
+          transformOrigin: "top left",
+        },
       });
-      dataURL = canvas.toDataURL("image/png");
     } catch(e) {
       alert("画像の生成に失敗しました。");
       console.error(e);
-    } finally {
-      if (fakeImg && fakeImg.parentNode) {
-        fakeImg.parentNode.replaceChild(originalImg, fakeImg);
-      }
     }
 
     if (!dataURL) { setSaving(false); return; }
@@ -269,7 +234,7 @@ function PlayerCard({ player, theme, onEdit }) {
           overflow:"hidden", zIndex:0,
         }}>
           {player.screenshotDataUrl ? (
-            <img ref={imgRef} src={player.screenshotDataUrl} alt="bg" style={{
+            <img src={player.screenshotDataUrl} alt="bg" style={{
               width:"100%", height:"100%", objectFit:"cover", display:"block",
             }}/>
           ) : (
