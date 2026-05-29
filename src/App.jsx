@@ -132,45 +132,71 @@ function PlayerCard({ player, theme, onEdit }) {
     await document.fonts.ready;
     await new Promise(r => setTimeout(r, 150));
 
-    // Base64 dataURL → Blob URL に変換（dom-to-image-more が inline画像を描画できない問題の回避）
-    let blobUrl = null;
-    if (player.screenshotDataUrl) {
-      try {
-        const res  = await fetch(player.screenshotDataUrl);
-        const blob = await res.blob();
-        blobUrl = URL.createObjectURL(blob);
-        // カード内の background-image を一時的に Blob URL に差し替え
-        const bgDiv = cardRef.current.querySelector("[data-screenshot]");
-        if (bgDiv) bgDiv.style.backgroundImage = `url(${blobUrl})`;
-        await new Promise(r => setTimeout(r, 100));
-      } catch(e) {
-        console.warn("Blob URL変換失敗、そのまま続行:", e);
-      }
-    }
-
     let dataURL = null;
     try {
-      dataURL = await domtoimage.toJpeg(cardRef.current, {
+      const SCALE = 2;
+      const W = CARD_W * SCALE;
+      const H = CARD_H * SCALE;
+
+      // ── ① スクショ部分を除いたカード全体を dom-to-image でキャプチャ ──
+      // スクショdivを一時的に非表示にしてキャプチャ
+      const bgDiv = cardRef.current.querySelector("[data-screenshot]");
+      if (bgDiv) bgDiv.style.visibility = "hidden";
+
+      const cardDataURL = await domtoimage.toJpeg(cardRef.current, {
         quality: 0.95,
-        width:  CARD_W * 2,
-        height: CARD_H * 2,
-        style: {
-          transform: "scale(2)",
-          transformOrigin: "top left",
-        },
+        width: W, height: H,
+        style: { transform:`scale(${SCALE})`, transformOrigin:"top left" },
         cacheBust: true,
         filter: () => true,
       });
+
+      if (bgDiv) bgDiv.style.visibility = "visible";
+
+      // ── ② 最終合成キャンバスを作成 ──
+      const finalCanvas = document.createElement("canvas");
+      finalCanvas.width  = W;
+      finalCanvas.height = H;
+      const ctx = finalCanvas.getContext("2d");
+
+      // ── ③ スクショ画像があればCanvasで直接描画（cover） ──
+      if (player.screenshotDataUrl) {
+        await new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const photoH = PHOTO_H * SCALE;
+            // cover クロップ計算
+            const scale = Math.max(W / img.naturalWidth, photoH / img.naturalHeight);
+            const sw = W / scale, sh = photoH / scale;
+            const sx = (img.naturalWidth  - sw) / 2;
+            const sy = (img.naturalHeight - sh) / 2;
+            ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, photoH);
+            resolve();
+          };
+          img.onerror = resolve;
+          img.src = player.screenshotDataUrl;
+        });
+      }
+
+      // ── ④ カード（スクショなし）を上に重ねる ──
+      await new Promise((resolve) => {
+        const cardImg = new Image();
+        cardImg.onload = () => {
+          ctx.drawImage(cardImg, 0, 0, W, H);
+          resolve();
+        };
+        cardImg.onerror = resolve;
+        cardImg.src = cardDataURL;
+      });
+
+      dataURL = finalCanvas.toDataURL("image/jpeg", 0.95);
+
     } catch(e) {
+      // スクショdivが非表示のままにならないよう復元
+      const bgDiv = cardRef.current?.querySelector("[data-screenshot]");
+      if (bgDiv) bgDiv.style.visibility = "visible";
       alert("画像の生成に失敗しました。");
       console.error(e);
-    } finally {
-      // Blob URL を解放して元の dataURL に戻す
-      if (blobUrl) {
-        const bgDiv = cardRef.current?.querySelector("[data-screenshot]");
-        if (bgDiv) bgDiv.style.backgroundImage = `url(${player.screenshotDataUrl})`;
-        URL.revokeObjectURL(blobUrl);
-      }
     }
 
     if (!dataURL) { setSaving(false); return; }
