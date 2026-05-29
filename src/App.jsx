@@ -401,9 +401,10 @@ function PlayerCard({ player, theme, onEdit }) {
           {/* 下部スペーサー */}
           <div style={{flex:1}}/>
 
-          {/* © SQUARE ENIX */}
-          <div style={{textAlign:"center",fontSize:".44rem",color:t.footerText,fontFamily:"Rajdhani,sans-serif",opacity:.7,marginBottom:".2rem"}}>
-            © SQUARE ENIX
+          {/* FINAL FANTASY XIV / © SQUARE ENIX */}
+          <div style={{textAlign:"center",fontFamily:"Rajdhani,sans-serif",opacity:.7,marginBottom:".2rem"}}>
+            <div style={{fontSize:".5rem",color:t.footerText,letterSpacing:".12em",marginBottom:".1rem"}}>FINAL FANTASY XIV</div>
+            <div style={{fontSize:".44rem",color:t.footerText,letterSpacing:".05em"}}>© SQUARE ENIX</div>
           </div>
 
           {/* フッター */}
@@ -645,6 +646,15 @@ function PlayerForm({ initial, initialTheme, onSave }) {
           letterSpacing:".15em", textTransform:"uppercase", transition:"all .2s",
           marginBottom:"3rem",
         }}>カードを表示 →</button>
+
+        {/* フォーム最下部：FINAL FANTASY XIV / © SQUARE ENIX */}
+        <div style={{
+          textAlign:"center", marginBottom:"2rem", opacity:.5,
+          fontFamily:"Rajdhani,sans-serif",
+        }}>
+          <div style={{fontSize:".55rem",color:isLight?"#888888":"#ffffff44",letterSpacing:".12em",marginBottom:".15rem"}}>FINAL FANTASY XIV</div>
+          <div style={{fontSize:".5rem",color:isLight?"#888888":"#ffffff33",letterSpacing:".05em"}}>© SQUARE ENIX</div>
+        </div>
 
       </div>
     </div>
