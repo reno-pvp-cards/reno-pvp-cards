@@ -78,7 +78,6 @@ const RANK_COLOR = {
   "ブロンズ":     "#ffcc80",
 };
 
-// ライトテーマ用：少し落ち着いた色に調整
 const RANK_COLOR_LIGHT = {
   "オメガ":       "#d63faa",
   "アルテマ":     "#b8860b",
@@ -106,7 +105,6 @@ const THEMES = {
   dark: {
     id: "dark",
     label: "🌙 ダーク",
-    // カード
     cardBg: "linear-gradient(170deg, #0d0d18 0%, #111128 60%, #0d0d1e 100%)",
     cardBorder: () => "#a8d8ea33",
     cardShadow: () => "0 0 60px #a8d8ea18, 0 20px 60px #00000080",
@@ -115,7 +113,6 @@ const THEMES = {
     infoBg: "#0d0d18",
     infoBorder: () => "#a8d8ea22",
     infoGridBg: () => "#a8d8ea18",
-    // テキスト
     nameColor: "#ffffff",
     nickColor: "#ffffffaa",
     labelColor: "#ffffff33",
@@ -132,12 +129,9 @@ const THEMES = {
     tournamentBorder: "rgba(255,255,255,0.06)",
     footerBorder: () => "#a8d8ea18",
     footerText: "#ffffff1a",
-    // ページ背景
     pageBg: "#070710",
-    // ランクバッジ
     badgeBg: "#0d0d18cc",
     badgeBorder: () => "#a8d8ea66",
-    // ボタン
     saveBtnBg: () => "#a8d8ea18",
     saveBtnBorder: () => "#a8d8ea44",
     saveBtnColor: () => "#a8d8ea",
@@ -201,11 +195,29 @@ const emptyPlayer = {
   sns: [],
 };
 
+// ===================== objectFit:cover をcanvasで再現 =====================
+function buildCroppedCanvas(imgEl, displayW, displayH) {
+  const c = document.createElement("canvas");
+  c.width  = displayW;
+  c.height = displayH;
+  const ctx = c.getContext("2d");
+  const iw = imgEl.naturalWidth;
+  const ih = imgEl.naturalHeight;
+  const scale = Math.max(displayW / iw, displayH / ih);
+  const sw = displayW / scale;
+  const sh = displayH / scale;
+  const sx = (iw - sw) / 2;
+  const sy = (ih - sh) / 2;
+  ctx.drawImage(imgEl, sx, sy, sw, sh, 0, 0, displayW, displayH);
+  return c;
+}
+
 // ===================== CARD VIEW =====================
 function PlayerCard({ player, theme, onEdit }) {
   const t = THEMES[theme] || THEMES.dark;
   const rc = t.rankColor(player.highestRank);
   const cardRef = useRef(null);
+  const imgRef  = useRef(null);
   const [saving, setSaving] = useState(false);
   const fullName = [player.firstName, player.lastName].filter(Boolean).join(" ");
 
@@ -216,24 +228,109 @@ function PlayerCard({ player, theme, onEdit }) {
       return;
     }
     setSaving(true);
-    // DOMの再レンダリングを待つ
-    await new Promise(r => setTimeout(r, 100));
+    await document.fonts.ready;
+    await new Promise(r => setTimeout(r, 150));
+
+    // スクショ画像をcanvasでクロップしてobjectFit:coverを再現
+    let fakeImgEl = null;
+    const originalImg = imgRef.current;
+    if (originalImg && player.screenshotDataUrl) {
+      const cropped = buildCroppedCanvas(originalImg, 420, 310);
+      fakeImgEl = document.createElement("img");
+      fakeImgEl.src = cropped.toDataURL();
+      fakeImgEl.style.cssText = originalImg.style.cssText;
+      fakeImgEl.style.objectFit = "fill";
+      originalImg.parentNode.replaceChild(fakeImgEl, originalImg);
+    }
+
+    let dataURL = null;
     try {
       const canvas = await window.html2canvas(cardRef.current, {
         backgroundColor: theme === "light" ? "#f5f5f0" : "#0d0d18",
         scale: 2, useCORS: true, allowTaint: true, logging: false,
       });
-      const link = document.createElement("a");
-      link.download = `cc-card-${fullName || "player"}-${theme}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
+      dataURL = canvas.toDataURL("image/png");
     } catch (e) {
-      alert("画像の保存に失敗しました。");
+      alert("画像の生成に失敗しました。");
+      console.error(e);
+    } finally {
+      // 必ず元の<img>に戻す
+      if (fakeImgEl && fakeImgEl.parentNode) {
+        fakeImgEl.parentNode.replaceChild(originalImg, fakeImgEl);
+      }
     }
+
+    if (!dataURL) { setSaving(false); return; }
+
+    const fileName = `cc-card-${fullName || "player"}-${theme}.png`;
+    const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent) && !window.MSStream;
+
+    if (isIOS) {
+      // ── iOS：Web Share API でシェアシートを開く（Safari・Chrome両対応）──
+      // dataURL → Blob → File に変換してシェア
+      try {
+        const res  = await fetch(dataURL);
+        const blob = await res.blob();
+        const file = new File([blob], fileName, { type: "image/png" });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          // シェアシート経由で「写真に追加」できる
+          await navigator.share({
+            files: [file],
+            title: "CC Player Card",
+          });
+        } else {
+          // Web Share API非対応の古い端末はフォールバック
+          showIOSFallback(dataURL);
+        }
+      } catch (e) {
+        // キャンセルは正常動作なので無視、それ以外はフォールバック
+        if (e.name !== "AbortError") {
+          showIOSFallback(dataURL);
+        }
+      }
+    } else {
+      // PC / Android：通常ダウンロード
+      const link = document.createElement("a");
+      link.download = fileName;
+      link.href = dataURL;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
     setSaving(false);
   };
 
-  const allJobs = [player.mainJob, ...(player.subJobs || [])].filter(Boolean);
+  // iOS Web Share API非対応端末向けフォールバック（長押し保存）
+  const showIOSFallback = (dataURL) => {
+    const overlay = document.createElement("div");
+    overlay.style.cssText = `
+      position:fixed; inset:0; z-index:9999;
+      background:rgba(0,0,0,0.92);
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      padding:1.5rem;
+    `;
+    const msg = document.createElement("p");
+    msg.textContent = "📥 画像を長押しして「写真に追加」で保存できます";
+    msg.style.cssText = "color:#ccc;font-size:14px;font-family:sans-serif;text-align:center;margin:0 0 1rem;line-height:1.6;";
+    const img = document.createElement("img");
+    img.src = dataURL;
+    img.style.cssText = "max-width:100%; max-height:65vh; border-radius:4px;";
+    const closeBtn = document.createElement("button");
+    closeBtn.textContent = "✕ 閉じる";
+    closeBtn.style.cssText = `
+      color:#fff; background:transparent; border:1px solid #555;
+      border-radius:8px; padding:.5rem 1.5rem; font-size:14px;
+      cursor:pointer; font-family:sans-serif; margin-top:1rem;
+    `;
+    closeBtn.onclick = () => document.body.removeChild(overlay);
+    overlay.appendChild(msg);
+    overlay.appendChild(img);
+    overlay.appendChild(closeBtn);
+    document.body.appendChild(overlay);
+  };
 
   return (
     <div style={{
@@ -262,7 +359,7 @@ function PlayerCard({ player, theme, onEdit }) {
 
       <div className="cc-card" ref={cardRef} style={{
         width: "100%", maxWidth: "420px",
-        height: "720px",
+        minHeight: "720px",
         position: "relative",
         overflow: "hidden",
         borderRadius: "0",
@@ -271,13 +368,18 @@ function PlayerCard({ player, theme, onEdit }) {
         display: "flex",
         flexDirection: "column",
       }}>
-        {/* スクショ：上部310px分のみ */}
+        {/* スクショ：上部310px */}
         {player.screenshotDataUrl ? (
-          <img src={player.screenshotDataUrl} alt="bg" style={{
-            position: "absolute", top: 0, left: 0,
-            width: "100%", height: "310px",
-            objectFit: "cover", display: "block", zIndex: 0,
-          }}/>
+          <img
+            ref={imgRef}
+            src={player.screenshotDataUrl}
+            alt="bg"
+            style={{
+              position: "absolute", top: 0, left: 0,
+              width: "100%", height: "310px",
+              objectFit: "cover", display: "block", zIndex: 0,
+            }}
+          />
         ) : (
           <div style={{
             position: "absolute", top: 0, left: 0, width: "100%", height: "310px",
@@ -285,7 +387,7 @@ function PlayerCard({ player, theme, onEdit }) {
           }}/>
         )}
 
-        {/* グラデーション：スクショ下端→背景色へなめらかに */}
+        {/* グラデーション */}
         <div style={{
           position: "absolute", top: "200px", left: 0, right: 0, height: "120px",
           background: theme === "light"
@@ -303,7 +405,7 @@ function PlayerCard({ player, theme, onEdit }) {
           zIndex: 3,
         }}/>
 
-        {/* ランクバッジ：右上 */}
+        {/* ランクバッジ */}
         <div style={{
           position: "absolute", top:"1rem", right:"1rem",
           background: t.badgeBg,
@@ -322,9 +424,9 @@ function PlayerCard({ player, theme, onEdit }) {
           }}>{player.highestRank || "—"}</div>
         </div>
 
-        {/* 名前：スクショ下端グラデに重ねる */}
+        {/* 名前 */}
         <div style={{
-          position: "absolute", bottom: "438px", left: "1.2rem", right: "5rem",
+          position: "absolute", top: "220px", left: "1.2rem", right: "5rem",
           zIndex: 3,
         }}>
           <div style={{
@@ -349,157 +451,154 @@ function PlayerCard({ player, theme, onEdit }) {
           )}
         </div>
 
-        {/* 情報エリア：下部410px */}
+        {/* 情報エリア */}
         <div style={{
-          position: "absolute", bottom: 0, left: 0, right: 0,
-          height: "410px",
+          marginTop: "320px",
           padding: "0.7rem 1.2rem 0",
           display: "flex", flexDirection: "column",
-          zIndex: 2,
+          zIndex: 2, flex: 1,
         }}>
-          <div style={{ flex: 1, overflow: "hidden" }}>
 
-            {/* SERVER / TEAM */}
-            <div style={{
-              display: "grid", gridTemplateColumns: "1fr 1fr",
-              gap: "1px", background: t.infoGridBg(rc),
-              border: `1px solid ${t.infoBorder(rc)}`,
-              borderRadius: "8px", overflow: "hidden",
-              marginBottom: ".7rem",
-            }}>
-              {[
-                { label: "SERVER", value: player.server },
-                { label: "TEAM",   value: player.team || "—" },
-              ].map(item => (
-                <div key={item.label} style={{
-                  background: theme === "light" ? "rgba(245,245,240,0.85)" : "rgba(13,13,24,0.75)",
-                  padding: ".3rem .7rem",
-                  backdropFilter: "blur(4px)",
-                }}>
-                  <div style={{
-                    fontSize: ".5rem", letterSpacing: ".12em",
-                    color: t.labelColor, fontFamily: "Rajdhani, sans-serif",
-                    marginBottom: ".1rem",
-                  }}>{item.label}</div>
-                  <div style={{
-                    fontSize: ".75rem", color: t.valueColor,
-                    fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 500,
-                  }}>{item.value || "—"}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* ジョブ */}
-            <div style={{ marginBottom: ".4rem" }}>
-              <div style={{
-                fontSize: ".5rem", letterSpacing: ".15em", color: t.labelColor,
-                fontFamily: "Rajdhani, sans-serif", marginBottom: ".25rem",
-                textTransform: "uppercase",
-              }}>Jobs</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: ".25rem" }}>
-                {JOB_LIST.map(j => {
-                  const isMain = j === player.mainJob;
-                  const isSub = (player.subJobs || []).includes(j);
-                  const isActive = isMain || isSub;
-                  const fixedColor = theme === "light" ? "#d63faa" : "#a8d8ea";
-                  return (
-                    <span key={j} style={{
-                      padding: ".15rem .5rem",
-                      background: isActive
-                        ? (theme === "light" ? "#d63faa18" : "#a8d8ea18")
-                        : (theme === "light" ? "rgba(245,245,240,0.5)" : "rgba(13,13,24,0.4)"),
-                      border: `1px solid ${isActive
-                        ? (theme === "light" ? "#d63faa55" : "#a8d8ea55")
-                        : (theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)")}`,
-                      borderRadius: "999px", fontSize: ".65rem",
-                      color: isActive ? fixedColor : (theme === "light" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.18)"),
-                      fontFamily: "'Noto Sans JP', sans-serif",
-                      fontWeight: isMain ? 700 : 400,
-                    }}>
-                      {isMain ? "★ " : ""}{j}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* プレイスタイル */}
-            <div style={{ marginBottom: ".4rem" }}>
-              <div style={{
-                fontSize: ".5rem", letterSpacing: ".15em", color: t.labelColor,
-                fontFamily: "Rajdhani, sans-serif", marginBottom: ".25rem",
-                textTransform: "uppercase",
-              }}>Play Style</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: ".25rem" }}>
-                {PLAYSTYLE_LIST.map(s => {
-                  const isActive = (player.playstyle || []).includes(s);
-                  return (
-                    <span key={s} style={{
-                      padding: ".15rem .5rem",
-                      background: isActive
-                        ? (theme === "light" ? "#d63faa18" : "#a8d8ea18")
-                        : (theme === "light" ? "rgba(245,245,240,0.5)" : "rgba(13,13,24,0.4)"),
-                      border: `1px solid ${isActive
-                        ? (theme === "light" ? "#d63faa55" : "#a8d8ea55")
-                        : (theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)")}`,
-                      borderRadius: "999px", fontSize: ".65rem",
-                      color: isActive ? (theme === "light" ? "#d63faa" : "#a8d8ea") : (theme === "light" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.18)"),
-                      fontFamily: "'Noto Sans JP', sans-serif",
-                    }}>{s}</span>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* NOTE */}
-            <div style={{ marginBottom: ".4rem" }}>
-              <div style={{
-                fontSize: ".5rem", letterSpacing: ".15em", color: t.labelColor,
-                fontFamily: "Rajdhani, sans-serif", marginBottom: ".25rem",
-                textTransform: "uppercase",
-              }}>Note</div>
-              <div style={{
-                padding: ".4rem .7rem",
-                background: theme === "light" ? "rgba(245,245,240,0.8)" : "rgba(13,13,24,0.65)",
-                border: `1px solid ${t.tournamentBorder}`,
-                borderRadius: "8px", height: "50px",
-                fontSize: ".7rem",
-                color: player.freeText ? t.valueColor : (theme === "light" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.18)"),
-                fontFamily: "'Noto Sans JP', sans-serif",
-                lineHeight: 1.65, whiteSpace: "pre-wrap", wordBreak: "break-all",
-                overflow: "hidden", backdropFilter: "blur(4px)",
+          {/* SERVER / TEAM */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "1fr 1fr",
+            gap: "1px", background: t.infoGridBg(rc),
+            border: `1px solid ${t.infoBorder(rc)}`,
+            borderRadius: "8px", overflow: "hidden",
+            marginBottom: ".7rem",
+          }}>
+            {[
+              { label: "SERVER", value: player.server },
+              { label: "TEAM",   value: player.team || "—" },
+            ].map(item => (
+              <div key={item.label} style={{
+                background: theme === "light" ? "rgba(245,245,240,0.85)" : "rgba(13,13,24,0.75)",
+                padding: ".3rem .7rem",
+                backdropFilter: "blur(4px)",
               }}>
-                {player.freeText || ""}
+                <div style={{
+                  fontSize: ".5rem", letterSpacing: ".12em",
+                  color: t.labelColor, fontFamily: "Rajdhani, sans-serif",
+                  marginBottom: ".1rem",
+                }}>{item.label}</div>
+                <div style={{
+                  fontSize: ".75rem", color: t.valueColor,
+                  fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 500,
+                }}>{item.value || "—"}</div>
               </div>
-            </div>
+            ))}
+          </div>
 
-            {/* SNS：タイトルなし、ボタンのみ */}
-            <div style={{ marginBottom: "0" }}>
-              <div style={{ display: "flex", gap: ".25rem" }}>
-                {["X", "YouTube", "Twitch"].map(s => {
-                  const isActive = (player.sns || []).includes(s);
-                  return (
-                    <span key={s} style={{
-                      padding: ".15rem .5rem",
-                      background: isActive
-                        ? (theme === "light" ? "#d63faa18" : "#a8d8ea18")
-                        : (theme === "light" ? "rgba(245,245,240,0.5)" : "rgba(13,13,24,0.4)"),
-                      border: `1px solid ${isActive
-                        ? (theme === "light" ? "#d63faa55" : "#a8d8ea55")
-                        : (theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)")}`,
-                      borderRadius: "999px", fontSize: ".65rem",
-                      color: isActive ? (theme === "light" ? "#d63faa" : "#a8d8ea") : (theme === "light" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.18)"),
-                      fontFamily: "Rajdhani, sans-serif", letterSpacing: ".05em",
-                    }}>{s}</span>
-                  );
-                })}
-              </div>
+          {/* ジョブ */}
+          <div style={{ marginBottom: ".5rem" }}>
+            <div style={{
+              fontSize: ".5rem", letterSpacing: ".15em", color: t.labelColor,
+              fontFamily: "Rajdhani, sans-serif", marginBottom: ".25rem",
+              textTransform: "uppercase",
+            }}>Jobs</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: ".2rem" }}>
+              {JOB_LIST.map(j => {
+                const isMain   = j === player.mainJob;
+                const isSub    = (player.subJobs || []).includes(j);
+                const isActive = isMain || isSub;
+                const fixedColor = theme === "light" ? "#d63faa" : "#a8d8ea";
+                return (
+                  <span key={j} style={{
+                    padding: ".12rem .45rem",
+                    background: isActive
+                      ? (theme === "light" ? "#d63faa18" : "#a8d8ea18")
+                      : (theme === "light" ? "rgba(245,245,240,0.5)" : "rgba(13,13,24,0.4)"),
+                    border: `1px solid ${isActive
+                      ? (theme === "light" ? "#d63faa55" : "#a8d8ea55")
+                      : (theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)")}`,
+                    borderRadius: "999px", fontSize: ".6rem",
+                    color: isActive ? fixedColor : (theme === "light" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.18)"),
+                    fontFamily: "'Noto Sans JP', sans-serif",
+                    fontWeight: isMain ? 700 : 400,
+                  }}>
+                    {isMain ? "★ " : ""}{j}
+                  </span>
+                );
+              })}
             </div>
+          </div>
 
+          {/* プレイスタイル */}
+          <div style={{ marginBottom: ".5rem" }}>
+            <div style={{
+              fontSize: ".5rem", letterSpacing: ".15em", color: t.labelColor,
+              fontFamily: "Rajdhani, sans-serif", marginBottom: ".25rem",
+              textTransform: "uppercase",
+            }}>Play Style</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: ".2rem" }}>
+              {PLAYSTYLE_LIST.map(s => {
+                const isActive = (player.playstyle || []).includes(s);
+                return (
+                  <span key={s} style={{
+                    padding: ".12rem .45rem",
+                    background: isActive
+                      ? (theme === "light" ? "#d63faa18" : "#a8d8ea18")
+                      : (theme === "light" ? "rgba(245,245,240,0.5)" : "rgba(13,13,24,0.4)"),
+                    border: `1px solid ${isActive
+                      ? (theme === "light" ? "#d63faa55" : "#a8d8ea55")
+                      : (theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)")}`,
+                    borderRadius: "999px", fontSize: ".6rem",
+                    color: isActive ? (theme === "light" ? "#d63faa" : "#a8d8ea") : (theme === "light" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.18)"),
+                    fontFamily: "'Noto Sans JP', sans-serif",
+                  }}>{s}</span>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* NOTE */}
+          <div style={{ marginBottom: ".5rem" }}>
+            <div style={{
+              fontSize: ".5rem", letterSpacing: ".15em", color: t.labelColor,
+              fontFamily: "Rajdhani, sans-serif", marginBottom: ".25rem",
+              textTransform: "uppercase",
+            }}>Note</div>
+            <div style={{
+              padding: ".4rem .7rem",
+              background: theme === "light" ? "rgba(245,245,240,0.8)" : "rgba(13,13,24,0.65)",
+              border: `1px solid ${t.tournamentBorder}`,
+              borderRadius: "8px",
+              minHeight: "44px",
+              fontSize: ".7rem",
+              color: player.freeText ? t.valueColor : (theme === "light" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.18)"),
+              fontFamily: "'Noto Sans JP', sans-serif",
+              lineHeight: 1.65, whiteSpace: "pre-wrap", wordBreak: "break-all",
+              backdropFilter: "blur(4px)",
+            }}>
+              {player.freeText || ""}
+            </div>
+          </div>
+
+          {/* SNS */}
+          <div style={{ marginBottom: ".5rem" }}>
+            <div style={{ display: "flex", gap: ".25rem" }}>
+              {["X", "YouTube", "Twitch"].map(s => {
+                const isActive = (player.sns || []).includes(s);
+                return (
+                  <span key={s} style={{
+                    padding: ".12rem .45rem",
+                    background: isActive
+                      ? (theme === "light" ? "#d63faa18" : "#a8d8ea18")
+                      : (theme === "light" ? "rgba(245,245,240,0.5)" : "rgba(13,13,24,0.4)"),
+                    border: `1px solid ${isActive
+                      ? (theme === "light" ? "#d63faa55" : "#a8d8ea55")
+                      : (theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)")}`,
+                    borderRadius: "999px", fontSize: ".6rem",
+                    color: isActive ? (theme === "light" ? "#d63faa" : "#a8d8ea") : (theme === "light" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.18)"),
+                    fontFamily: "Rajdhani, sans-serif", letterSpacing: ".05em",
+                  }}>{s}</span>
+                );
+              })}
+            </div>
           </div>
 
           {/* コピーライト */}
-          <div style={{ flexShrink: 0, paddingBottom: "0", paddingTop: ".15rem" }}>
+          <div style={{ paddingTop: ".15rem" }}>
             <div style={{
               fontSize: ".48rem", color: t.footerText,
               fontFamily: "Rajdhani, sans-serif", letterSpacing: ".05em",
@@ -507,13 +606,13 @@ function PlayerCard({ player, theme, onEdit }) {
             }}>© SQUARE ENIX</div>
           </div>
 
-          {/* フッター：PNG保存中は非表示 */}
+          {/* フッター */}
           <div style={{
             display: saving ? "none" : "flex",
             justifyContent: "space-between", alignItems: "center",
-            padding: ".35rem 0 .4rem",
+            padding: ".35rem 0 .5rem",
             borderTop: `1px solid ${t.footerBorder(rc)}`,
-            flexShrink: 0,
+            marginTop: ".25rem",
           }}>
             <div style={{
               fontSize: ".55rem", color: t.footerText,
@@ -536,6 +635,7 @@ function PlayerCard({ player, theme, onEdit }) {
               }}>EDIT</button>
             </div>
           </div>
+
         </div>
       </div>
     </div>
@@ -596,16 +696,6 @@ function PlayerForm({ initial, initialTheme, onSave }) {
     fontFamily: "Rajdhani, sans-serif", textTransform: "uppercase",
   };
   const sec = { marginBottom: "1.5rem" };
-  const addBtn = {
-    width: "100%",
-    background: isLight ? "rgba(0,0,0,0.03)" : "rgba(168,216,234,0.05)",
-    border: isLight ? "1px dashed rgba(0,0,0,0.15)" : "1px dashed rgba(168,216,234,0.25)",
-    borderRadius: "8px",
-    color: isLight ? "#888888" : "#a8d8eaaa",
-    fontSize: ".75rem", padding: ".5rem",
-    cursor: "pointer", fontFamily: "Rajdhani, sans-serif",
-    letterSpacing: ".1em", marginTop: ".3rem",
-  };
 
   return (
     <div style={{
@@ -626,14 +716,12 @@ function PlayerForm({ initial, initialTheme, onSave }) {
       `}</style>
       <div style={{ width: "100%", maxWidth: "480px" }}>
 
-        {/* ヘッダー */}
         <div style={{
           fontSize: ".6rem", letterSpacing: ".25em",
           color: isLight ? "#aaaaaa" : "#ffffff33",
           marginBottom: ".4rem", fontFamily: "Rajdhani, sans-serif",
-        }}>
-          CC PLAYER CARD
-        </div>
+        }}>CC PLAYER CARD</div>
+
         <div style={{
           display: "flex", justifyContent: "space-between",
           alignItems: "center", marginBottom: "2rem",
@@ -642,10 +730,7 @@ function PlayerForm({ initial, initialTheme, onSave }) {
             color: isLight ? "#1a1a2e" : "#ffffff",
             fontSize: "1.5rem", fontFamily: "Rajdhani, sans-serif",
             fontWeight: 700, letterSpacing: ".05em", margin: 0,
-          }}>
-            プロフィール編集
-          </h1>
-          {/* テーマ切り替え */}
+          }}>プロフィール編集</h1>
           <div style={{
             display: "flex", gap: ".4rem",
             background: isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)",
@@ -657,20 +742,14 @@ function PlayerForm({ initial, initialTheme, onSave }) {
                 background: theme === th.id
                   ? (isLight ? "#ffffff" : "rgba(255,255,255,0.12)")
                   : "transparent",
-                border: "none",
-                borderRadius: "7px",
-                fontSize: ".72rem",
+                border: "none", borderRadius: "7px", fontSize: ".72rem",
                 color: theme === th.id
                   ? (isLight ? "#1a1a2e" : "#ffffff")
                   : (isLight ? "#888888" : "#ffffff55"),
-                cursor: "pointer",
-                fontFamily: "Rajdhani, sans-serif",
-                letterSpacing: ".05em",
-                transition: "all .2s",
+                cursor: "pointer", fontFamily: "Rajdhani, sans-serif",
+                letterSpacing: ".05em", transition: "all .2s",
                 boxShadow: theme === th.id ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
-              }}>
-                {th.label}
-              </button>
+              }}>{th.label}</button>
             ))}
           </div>
         </div>
@@ -680,15 +759,15 @@ function PlayerForm({ initial, initialTheme, onSave }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".8rem", marginBottom: ".8rem" }}>
             <div>
               <label style={lbl}>ファーストネーム</label>
-              <input style={inp} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="" />
+              <input style={inp} value={form.firstName} onChange={e => set("firstName", e.target.value)} />
             </div>
             <div>
               <label style={lbl}>ラストネーム</label>
-              <input style={inp} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="" />
+              <input style={inp} value={form.lastName} onChange={e => set("lastName", e.target.value)} />
             </div>
           </div>
           <label style={lbl}>呼び名</label>
-          <input style={inp} value={form.nickname} onChange={e => set("nickname", e.target.value)} placeholder="" />
+          <input style={inp} value={form.nickname} onChange={e => set("nickname", e.target.value)} />
         </div>
 
         {/* サーバー・ランク */}
@@ -720,32 +799,19 @@ function PlayerForm({ initial, initialTheme, onSave }) {
 
         {/* サブジョブ */}
         <div style={sec}>
-          <div style={{ marginBottom: ".3rem" }}>
-            <label style={{ ...lbl, marginBottom: 0 }}>使用ジョブ（複数選択可・無制限）</label>
-          </div>
+          <label style={{ ...lbl, marginBottom: ".3rem" }}>使用ジョブ（複数選択可・無制限）</label>
           <div style={{ display: "flex", flexWrap: "wrap", gap: ".4rem" }}>
             {JOB_LIST.filter(j => j !== form.mainJob).map(j => {
               const active = (form.subJobs || []).includes(j);
-
               return (
                 <span key={j} className="tag-toggle" onClick={() => toggleSubJob(j)} style={{
                   padding: ".25rem .7rem",
-                  background: active
-                    ? (isLight ? "rgba(42,127,160,0.15)" : "rgba(168,216,234,0.15)")
-                    : (isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.04)"),
-                  border: `1px solid ${active
-                    ? (isLight ? "rgba(42,127,160,0.5)" : "rgba(168,216,234,0.5)")
-                    : (isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)")}`,
+                  background: active ? (isLight ? "rgba(42,127,160,0.15)" : "rgba(168,216,234,0.15)") : (isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.04)"),
+                  border: `1px solid ${active ? (isLight ? "rgba(42,127,160,0.5)" : "rgba(168,216,234,0.5)") : (isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)")}`,
                   borderRadius: "999px", fontSize: ".75rem",
-                  color: active
-                    ? (isLight ? "#2a7fa0" : "#a8d8ea")
-                    : (isLight ? "#555566" : "#ffffff55"),
-                  fontFamily: "'Noto Sans JP', sans-serif",
-                  cursor: "pointer",
-                  transition: "all .15s",
-                }}>
-                  {j}
-                </span>
+                  color: active ? (isLight ? "#2a7fa0" : "#a8d8ea") : (isLight ? "#555566" : "#ffffff55"),
+                  fontFamily: "'Noto Sans JP', sans-serif", cursor: "pointer", transition: "all .15s",
+                }}>{j}</span>
               );
             })}
           </div>
@@ -760,22 +826,12 @@ function PlayerForm({ initial, initialTheme, onSave }) {
               return (
                 <span key={s} className="tag-toggle" onClick={() => togglePlaystyle(s)} style={{
                   padding: ".25rem .7rem",
-                  background: active
-                    ? (isLight ? "rgba(42,127,160,0.15)" : "rgba(168,216,234,0.15)")
-                    : (isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.04)"),
-                  border: `1px solid ${active
-                    ? (isLight ? "rgba(42,127,160,0.5)" : "rgba(168,216,234,0.5)")
-                    : (isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)")}`,
+                  background: active ? (isLight ? "rgba(42,127,160,0.15)" : "rgba(168,216,234,0.15)") : (isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.04)"),
+                  border: `1px solid ${active ? (isLight ? "rgba(42,127,160,0.5)" : "rgba(168,216,234,0.5)") : (isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)")}`,
                   borderRadius: "999px", fontSize: ".75rem",
-                  color: active
-                    ? (isLight ? "#2a7fa0" : "#a8d8ea")
-                    : (isLight ? "#555566" : "#ffffff55"),
-                  fontFamily: "'Noto Sans JP', sans-serif",
-                  cursor: "pointer",
-                  transition: "all .15s",
-                }}>
-                  {s}
-                </span>
+                  color: active ? (isLight ? "#2a7fa0" : "#a8d8ea") : (isLight ? "#555566" : "#ffffff55"),
+                  fontFamily: "'Noto Sans JP', sans-serif", cursor: "pointer", transition: "all .15s",
+                }}>{s}</span>
               );
             })}
           </div>
@@ -790,17 +846,13 @@ function PlayerForm({ initial, initialTheme, onSave }) {
         {/* スクショ */}
         <div style={sec}>
           <label style={lbl}>スクリーンショット画像</label>
-          {/* 推奨サイズ案内 */}
           <div style={{
-            marginBottom: ".6rem",
-            padding: ".45rem .75rem",
+            marginBottom: ".6rem", padding: ".45rem .75rem",
             background: isLight ? "rgba(42,127,160,0.06)" : "rgba(168,216,234,0.06)",
             border: isLight ? "1px solid rgba(42,127,160,0.2)" : "1px solid rgba(168,216,234,0.15)",
-            borderRadius: "8px",
-            fontSize: ".7rem",
+            borderRadius: "8px", fontSize: ".7rem",
             color: isLight ? "#2a7fa0" : "#a8d8eaaa",
-            fontFamily: "'Noto Sans JP', sans-serif",
-            lineHeight: 1.6,
+            fontFamily: "'Noto Sans JP', sans-serif", lineHeight: 1.6,
           }}>
             📐 推奨サイズ：横幅 <b>1280px 以上</b>・縦横比 <b>4:3 〜 16:9</b> 推奨
           </div>
@@ -815,13 +867,10 @@ function PlayerForm({ initial, initialTheme, onSave }) {
               }}/>
               <div style={{ display: "flex", gap: ".5rem" }}>
                 <button onClick={() => fileInputRef.current.click()} style={{
-                  flex: 1,
-                  background: isLight ? "rgba(42,127,160,0.08)" : "rgba(168,216,234,0.08)",
+                  flex: 1, background: isLight ? "rgba(42,127,160,0.08)" : "rgba(168,216,234,0.08)",
                   border: isLight ? "1px solid rgba(42,127,160,0.3)" : "1px solid rgba(168,216,234,0.3)",
-                  borderRadius: "8px",
-                  color: isLight ? "#2a7fa0" : "#a8d8ea",
-                  fontSize: ".75rem", padding: ".4rem",
-                  cursor: "pointer", fontFamily: "Rajdhani, sans-serif",
+                  borderRadius: "8px", color: isLight ? "#2a7fa0" : "#a8d8ea",
+                  fontSize: ".75rem", padding: ".4rem", cursor: "pointer", fontFamily: "Rajdhani, sans-serif",
                 }}>画像を変更</button>
                 <button onClick={() => set("screenshotDataUrl", "")} style={{
                   flex: 1, background: "rgba(255,100,100,0.06)",
@@ -850,7 +899,7 @@ function PlayerForm({ initial, initialTheme, onSave }) {
           )}
         </div>
 
-        {/* フリースペース */}
+        {/* NOTE */}
         <div style={sec}>
           <label style={lbl}>NOTE（大会履歴・活動内容・一言など）</label>
           <textarea
@@ -858,20 +907,13 @@ function PlayerForm({ initial, initialTheme, onSave }) {
             onChange={e => set("freeText", e.target.value)}
             placeholder={"例）くりこん杯 3位\n週末メインでプレイ中\n気軽に絡んでください！"}
             maxLength={120}
-            style={{
-              ...inp,
-              height: "90px",
-              resize: "none",
-              lineHeight: 1.7,
-            }}
+            style={{ ...inp, height: "90px", resize: "none", lineHeight: 1.7 }}
           />
           <div style={{
             textAlign: "right", fontSize: ".6rem",
             color: isLight ? "#aaaaaa" : "#ffffff33",
             fontFamily: "Rajdhani, sans-serif", marginTop: ".2rem",
-          }}>
-            {(form.freeText || "").length} / 120
-          </div>
+          }}>{(form.freeText || "").length} / 120</div>
         </div>
 
         {/* SNS */}
@@ -883,20 +925,12 @@ function PlayerForm({ initial, initialTheme, onSave }) {
               return (
                 <span key={s} className="tag-toggle" onClick={() => toggleSns(s)} style={{
                   padding: ".3rem .9rem",
-                  background: active
-                    ? (isLight ? "rgba(42,127,160,0.15)" : "rgba(168,216,234,0.15)")
-                    : (isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.04)"),
-                  border: `1px solid ${active
-                    ? (isLight ? "rgba(42,127,160,0.5)" : "rgba(168,216,234,0.5)")
-                    : (isLight ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)")}`,
+                  background: active ? (isLight ? "rgba(42,127,160,0.15)" : "rgba(168,216,234,0.15)") : (isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.04)"),
+                  border: `1px solid ${active ? (isLight ? "rgba(42,127,160,0.5)" : "rgba(168,216,234,0.5)") : (isLight ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)")}`,
                   borderRadius: "999px", fontSize: ".8rem",
-                  color: active
-                    ? (isLight ? "#2a7fa0" : "#a8d8ea")
-                    : (isLight ? "#555566" : "#ffffff55"),
-                  fontFamily: "Rajdhani, sans-serif",
-                  letterSpacing: ".05em",
-                  cursor: "pointer",
-                  transition: "all .15s",
+                  color: active ? (isLight ? "#2a7fa0" : "#a8d8ea") : (isLight ? "#555566" : "#ffffff55"),
+                  fontFamily: "Rajdhani, sans-serif", letterSpacing: ".05em",
+                  cursor: "pointer", transition: "all .15s",
                 }}>{s}</span>
               );
             })}
@@ -910,15 +944,13 @@ function PlayerForm({ initial, initialTheme, onSave }) {
             ? "linear-gradient(90deg, rgba(42,127,160,0.12), rgba(68,85,204,0.12))"
             : "linear-gradient(90deg, rgba(168,216,234,0.12), rgba(184,200,255,0.12))",
           border: isLight ? "1px solid rgba(42,127,160,0.4)" : "1px solid rgba(168,216,234,0.4)",
-          borderRadius: "12px",
-          color: isLight ? "#2a7fa0" : "#a8d8ea",
+          borderRadius: "12px", color: isLight ? "#2a7fa0" : "#a8d8ea",
           fontSize: ".9rem", fontWeight: 600, padding: ".9rem",
           cursor: "pointer", fontFamily: "Rajdhani, sans-serif",
           letterSpacing: ".15em", textTransform: "uppercase", transition: "all .2s",
           marginBottom: "3rem",
-        }}>
-          カードを表示 →
-        </button>
+        }}>カードを表示 →</button>
+
       </div>
     </div>
   );
@@ -926,9 +958,9 @@ function PlayerForm({ initial, initialTheme, onSave }) {
 
 // ===================== APP =====================
 export default function App() {
-  const [view, setView] = useState("form");
+  const [view, setView]     = useState("form");
   const [player, setPlayer] = useState(emptyPlayer);
-  const [theme, setTheme] = useState("dark");
+  const [theme, setTheme]   = useState("dark");
 
   const handleSave = (data, selectedTheme) => {
     setPlayer(data);
