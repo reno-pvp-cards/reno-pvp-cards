@@ -261,28 +261,35 @@ function PlayerCard({ player, theme, onEdit }) {
       }}>
 
         {/* ── 上段：スクショ写真エリア（300px）── */}
+        {/* overflow:hidden は dom-to-image-more と相性問題があるため使わない */}
         <div style={{
-          position:"absolute", top:0, left:0,
-          width:`${CARD_W}px`, height:`${PHOTO_H}px`,
-          overflow:"hidden", zIndex:0,
+          position:"absolute", inset:0,
+          zIndex:0,
         }}>
           {player.screenshotDataUrl ? (
             <img
               data-screenshot="true"
               src={player.screenshotDataUrl}
               alt=""
+              crossOrigin="anonymous"
               style={{
-                width:"100%", height:"100%",
+                position:"absolute",
+                top:0, left:0,
+                width:`${CARD_W}px`,
+                height:`${PHOTO_H}px`,
                 objectFit:"cover",
-                display:"block",
               }}
             />
           ) : (
-            <div style={{ width:"100%", height:"100%", background:t.screenshotBg }}/>
+            <div style={{
+              position:"absolute", top:0, left:0,
+              width:`${CARD_W}px`, height:`${PHOTO_H}px`,
+              background:t.screenshotBg,
+            }}/>
           )}
           {/* 写真→情報エリアへのグラデ */}
           <div style={{
-            position:"absolute", bottom:0, left:0, right:0, height:"100px",
+            position:"absolute", top:`${PHOTO_H - 100}px`, left:0, right:0, height:"100px",
             background:`linear-gradient(to bottom, transparent, ${t.gradientColor})`,
           }}/>
         </div>
@@ -299,7 +306,7 @@ function PlayerCard({ player, theme, onEdit }) {
           position:"absolute", top:"1rem", right:"1rem", zIndex:4,
           background:t.badgeBg, border:`1px solid ${t.badgeBorder(rc)}`,
           borderRadius:"10px", padding:".4rem .8rem", textAlign:"center",
-          backdropFilter:"blur(8px)",
+          /* backdropFilter削除: Safari/dom-to-image-more で描画崩れの原因になるため */
         }}>
           <div style={{fontSize:"1.4rem",lineHeight:1}}>{RANK_ICON[player.highestRank]||"🎮"}</div>
           <div style={{fontSize:".62rem",color:rc,fontWeight:700,fontFamily:"Rajdhani,sans-serif",letterSpacing:".08em",marginTop:".2rem"}}>
@@ -341,7 +348,7 @@ function PlayerCard({ player, theme, onEdit }) {
             borderRadius:"8px", overflow:"hidden", marginBottom:".5rem", flexShrink:0,
           }}>
             {[{label:"SERVER",value:player.server},{label:"TEAM",value:player.team||"—"}].map(item=>(
-              <div key={item.label} style={{background:t.itemBg,padding:".25rem .6rem",backdropFilter:"blur(4px)"}}>
+              <div key={item.label} style={{background:t.itemBg,padding:".25rem .6rem"/* backdropFilter削除 */}}>
                 <div style={{fontSize:".45rem",letterSpacing:".12em",color:t.labelColor,fontFamily:"Rajdhani,sans-serif",marginBottom:".05rem"}}>{item.label}</div>
                 <div style={{fontSize:".72rem",color:t.valueColor,fontFamily:"'Noto Sans JP',sans-serif",fontWeight:500}}>{item.value||"—"}</div>
               </div>
@@ -386,7 +393,7 @@ function PlayerCard({ player, theme, onEdit }) {
               color:player.freeText?t.valueColor:t.inactiveTagColor,
               fontFamily:"'Noto Sans JP',sans-serif",
               lineHeight:1.6, whiteSpace:"pre-wrap", wordBreak:"break-all",
-              backdropFilter:"blur(4px)",
+              /* backdropFilter削除: Safari/dom-to-image-more で描画崩れの原因になるため */
               height:"52px", overflow:"hidden",
             }}>
               {player.freeText||""}
