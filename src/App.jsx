@@ -123,20 +123,20 @@ function PlayerCard({ player, theme, onEdit }) {
   const t = THEMES[theme] || THEMES.dark;
   const rc = t.rankColor(player.highestRank);
   const cardRef = useRef(null);
-  const [saving, setSaving] = useState(false);
   const fullName = [player.firstName, player.lastName].filter(Boolean).join(" ");
 
-  const handleSaveImage = async () => {
-    if (!cardRef.current) return;
-    setSaving(true);
-    await document.fonts.ready;
+  // PNG保存はボタン不要。
+  // dom-to-image-more でレンダリングした PNG を cardImgSrc に格納し、
+  // <img> タグで表示する。ユーザーは右クリック（PC）or 長押し（スマホ）で保存。
+  const [cardImgSrc, setCardImgSrc] = useState(null);
+  const [rendering, setRendering] = useState(false);
 
-    // saving=true でフッターが非表示になった後、DOM更新を待つ
+  const handleRenderCard = async () => {
+    if (!cardRef.current) return;
+    setRendering(true);
+    await document.fonts.ready;
     await new Promise(r => setTimeout(r, 200));
 
-    // ── Base64 dataURL → Blob URL 変換 ──
-    // imgタグ化により bgDiv.src に直接セットする方式に変更
-    // （background-image + base64 は dom-to-image-more で不安定なため）
     let blobUrl = null;
     let bgImg = null;
     if (player.screenshotDataUrl) {
@@ -146,24 +146,17 @@ function PlayerCard({ player, theme, onEdit }) {
         blobUrl = URL.createObjectURL(blob);
         bgImg = cardRef.current.querySelector("[data-screenshot]");
         if (bgImg) bgImg.src = blobUrl;
-
-        // imgのload完了を確実に待つ
         await new Promise((resolve) => {
           const tmp = new Image();
-          tmp.onload  = resolve;
-          tmp.onerror = resolve; // エラー時も続行
+          tmp.onload = resolve; tmp.onerror = resolve;
           tmp.src = blobUrl;
         });
-        // レンダリング反映まで追加待機
         await new Promise(r => setTimeout(r, 150));
       } catch(e) {
         console.warn("Blob URL変換失敗、そのまま続行:", e);
       }
     }
 
-    // ── dom-to-image-more でキャプチャ ──
-    // scale オプションで2倍出力（width/height + transform の組み合わせは画像が消える問題あり）
-    // filter は渡さない（一部バージョンで cacheBust と干渉するバグあり）
     let dataURL = null;
     try {
       dataURL = await domtoimage.toPng(cardRef.current, {
@@ -174,53 +167,14 @@ function PlayerCard({ player, theme, onEdit }) {
       alert("画像の生成に失敗しました。");
       console.error(e);
     } finally {
-      // Blob URL を解放し、imgのsrcを元の dataURL に戻す
       if (blobUrl && bgImg) {
         bgImg.src = player.screenshotDataUrl;
         URL.revokeObjectURL(blobUrl);
       }
-      setSaving(false);
+      setRendering(false);
     }
 
-    if (!dataURL) return;
-
-    const fileName = `cc-card-${fullName||"player"}-${theme}.png`;
-    const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent) && !window.MSStream;
-
-    if (isIOS) {
-      try {
-        const blob = await (await fetch(dataURL)).blob();
-        const file = new File([blob], fileName, { type:"image/png" });
-        if (navigator.canShare && navigator.canShare({ files:[file] })) {
-          await navigator.share({ files:[file], title:"CC Player Card" });
-        } else {
-          showFallback(dataURL);
-        }
-      } catch(e) {
-        if (e.name !== "AbortError") showFallback(dataURL);
-      }
-    } else {
-      const a = document.createElement("a");
-      a.download = fileName; a.href = dataURL;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    }
-  };
-
-  const showFallback = (dataURL) => {
-    const ov = document.createElement("div");
-    ov.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;";
-    const msg = document.createElement("p");
-    msg.textContent = "📥 画像を長押しして「写真に追加」で保存できます";
-    msg.style.cssText = "color:#ccc;font-size:14px;font-family:sans-serif;text-align:center;margin:0 0 1rem;line-height:1.6;";
-    const img = document.createElement("img");
-    img.src = dataURL;
-    img.style.cssText = "max-width:100%;max-height:65vh;border-radius:4px;";
-    const btn = document.createElement("button");
-    btn.textContent = "✕ 閉じる";
-    btn.style.cssText = "color:#fff;background:transparent;border:1px solid #555;border-radius:8px;padding:.5rem 1.5rem;font-size:14px;cursor:pointer;font-family:sans-serif;margin-top:1rem;";
-    btn.onclick = () => document.body.removeChild(ov);
-    ov.appendChild(msg); ov.appendChild(img); ov.appendChild(btn);
-    document.body.appendChild(ov);
+    if (dataURL) setCardImgSrc(dataURL);
   };
 
   // タグ共通スタイル
@@ -421,31 +375,97 @@ function PlayerCard({ player, theme, onEdit }) {
 
           {/* フッター */}
           <div style={{
-            display:saving?"none":"flex",
+            display:"flex",
             justifyContent:"space-between", alignItems:"center",
             paddingTop:".3rem",
             borderTop:`1px solid ${t.footerBorder(rc)}`,
             flexShrink:0,
           }}>
             <div style={{fontSize:".52rem",color:t.footerText,fontFamily:"Rajdhani,sans-serif",letterSpacing:".12em"}}>CC PLAYER CARD</div>
-            <div style={{display:"flex",gap:".5rem"}}>
-              <button onClick={handleSaveImage} className="cc-btn" style={{
-                background:t.saveBtnBg(rc), border:`1px solid ${t.saveBtnBorder(rc)}`,
-                borderRadius:"8px", color:t.saveBtnColor(rc),
-                fontSize:".68rem", padding:".28rem .75rem", cursor:"pointer",
-                fontFamily:"Rajdhani,sans-serif", letterSpacing:".1em", transition:"all .2s",
-              }}>PNG保存</button>
-              <button onClick={onEdit} className="cc-btn" style={{
-                background:t.editBtnBg, border:`1px solid ${t.editBtnBorder}`,
-                borderRadius:"8px", color:t.editBtnColor,
-                fontSize:".68rem", padding:".28rem .75rem", cursor:"pointer",
-                fontFamily:"Rajdhani,sans-serif", letterSpacing:".1em", transition:"all .2s",
-              }}>EDIT</button>
-            </div>
+            <button onClick={onEdit} className="cc-btn" style={{
+              background:t.editBtnBg, border:`1px solid ${t.editBtnBorder}`,
+              borderRadius:"8px", color:t.editBtnColor,
+              fontSize:".68rem", padding:".28rem .75rem", cursor:"pointer",
+              fontFamily:"Rajdhani,sans-serif", letterSpacing:".1em", transition:"all .2s",
+            }}>EDIT</button>
           </div>
 
         </div>
       </div>
+
+      {/* ── PNG保存エリア ── */}
+      {/* カード本体とは別に、PNG化した画像を <img> で表示する。        */}
+      {/* 右クリック（PC）または長押し（スマホ）で保存できる。          */}
+      <div style={{width:`${CARD_W}px`,marginTop:"1.5rem",textAlign:"center"}}>
+
+        {/* 「画像を生成」ボタン */}
+        {!cardImgSrc && (
+          <button
+            onClick={handleRenderCard}
+            disabled={rendering}
+            className="cc-btn"
+            style={{
+              width:"100%",
+              background:t.saveBtnBg(rc), border:`1px solid ${t.saveBtnBorder(rc)}`,
+              borderRadius:"10px", color:t.saveBtnColor(rc),
+              fontSize:".8rem", padding:".5rem", cursor:rendering?"not-allowed":"pointer",
+              fontFamily:"Rajdhani,sans-serif", letterSpacing:".1em", transition:"all .2s",
+              opacity:rendering?.6:1,
+            }}
+          >
+            {rendering ? "生成中…" : "📷 保存用画像を生成"}
+          </button>
+        )}
+
+        {/* 生成済みPNG表示 */}
+        {cardImgSrc && (
+          <div>
+            {/* ガイドテキスト */}
+            <div style={{
+              marginBottom:".6rem",
+              padding:".45rem .75rem",
+              background:theme==="dark"?"rgba(168,216,234,0.06)":"rgba(42,127,160,0.06)",
+              border:theme==="dark"?"1px solid rgba(168,216,234,0.15)":"1px solid rgba(42,127,160,0.2)",
+              borderRadius:"8px",
+              fontSize:".7rem",
+              color:theme==="dark"?"#a8d8eaaa":"#2a7fa0",
+              fontFamily:"'Noto Sans JP',sans-serif",
+              lineHeight:1.7,
+            }}>
+              💾 <b>PC</b>：画像を右クリック →「名前を付けて画像を保存」<br/>
+              📱 <b>スマホ</b>：画像を長押し →「写真に追加」または「保存」
+            </div>
+
+            {/* PNG画像本体 */}
+            <img
+              src={cardImgSrc}
+              alt="CC Player Card"
+              style={{
+                width:"100%",
+                borderRadius:"4px",
+                display:"block",
+              }}
+            />
+
+            {/* 再生成ボタン */}
+            <button
+              onClick={()=>{ setCardImgSrc(null); }}
+              className="cc-btn"
+              style={{
+                marginTop:".75rem", width:"100%",
+                background:"transparent",
+                border:`1px solid ${theme==="dark"?"rgba(255,255,255,0.1)":"rgba(0,0,0,0.1)"}`,
+                borderRadius:"8px",
+                color:theme==="dark"?"#ffffff44":"#aaaaaa",
+                fontSize:".7rem", padding:".35rem",
+                cursor:"pointer", fontFamily:"Rajdhani,sans-serif",
+                letterSpacing:".08em", transition:"all .2s",
+              }}
+            >↺ 再生成</button>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
