@@ -237,8 +237,11 @@ function PlayerCard({ player, theme, onEdit }) {
           overflow:"hidden", zIndex:0,
         }}>
           {player.screenshotDataUrl ? (
-            <img src={player.screenshotDataUrl} alt="bg" style={{
-              width:"100%", height:"100%", objectFit:"cover", display:"block",
+            <div style={{
+              width:"100%", height:"100%",
+              backgroundImage:`url(${player.screenshotDataUrl})`,
+              backgroundSize:"cover",
+              backgroundPosition:"center",
             }}/>
           ) : (
             <div style={{ width:"100%", height:"100%", background:t.screenshotBg }}/>
