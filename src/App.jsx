@@ -537,86 +537,186 @@ function CardView({ player, theme, onEdit }) {
   const [cardImgSrc, setCardImgSrc] = useState(null)
 
   const handleRenderCard = useCallback(async () => {
-    if (!cardRef.current) return
     setGenerating(true)
     setCardImgSrc(null)
-
-    // 画像をCanvasでcover/center-topクロップ → 差し替え用dataURLを生成
-    const cropImageToFit = (src, targetW, targetH) => new Promise((resolve, reject) => {
-      const img = new Image()
-      img.onload = () => {
-        const srcRatio = img.width / img.height
-        const tgtRatio = targetW / targetH
-        let sx, sy, sw, sh
-        if (srcRatio > tgtRatio) {
-          // 横が余る → 中央クロップ
-          sh = img.height; sw = sh * tgtRatio
-          sy = 0; sx = (img.width - sw) / 2
-        } else {
-          // 縦が余る → 上基準クロップ
-          sw = img.width; sh = sw / tgtRatio
-          sx = 0; sy = 0
-        }
-        const cv = document.createElement('canvas')
-        cv.width = targetW * 2; cv.height = targetH * 2
-        const ctx = cv.getContext('2d')
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, cv.width, cv.height)
-        resolve(cv.toDataURL('image/png'))
-      }
-      img.onerror = reject
-      img.src = src
-    })
 
     try {
       await document.fonts.ready
 
-      // スクショをクロップ済みdataURLに差し替え
-      let croppedUrl = null
-      const imgEl = cardRef.current.querySelector('img[data-screenshot]')
-      if (imgEl && player.screenshotDataUrl) {
-        croppedUrl = await cropImageToFit(player.screenshotDataUrl, 420, 300)
-        // 差し替え（html2canvasが読み込む前に確定させる）
-        imgEl.src = croppedUrl
-        imgEl.style.objectFit = 'fill'
-        imgEl.style.objectPosition = 'unset'
-        try { await imgEl.decode() } catch(e) {}
-      }
+      const S = 2          // retina scale
+      const W = 420, H = 800
+      const cw = W * S, ch = H * S
+      const cv = document.createElement('canvas')
+      cv.width = cw; cv.height = ch
+      const ctx = cv.getContext('2d')
+      ctx.scale(S, S)
 
-      // html2canvas を動的ロード
-      if (!window.html2canvas) {
-        await new Promise((resolve, reject) => {
-          const s = document.createElement('script')
-          s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'
-          s.onload = resolve
-          s.onerror = reject
-          document.head.appendChild(s)
-        })
-      }
-      const html2canvas = window.html2canvas
+      const t = THEME[theme]
+      const ac = t.accentColor
 
-      const canvas = await html2canvas(cardRef.current, {
-        scale: 2,
-        useCORS: false,
-        allowTaint: true,
-        backgroundColor: theme === 'dark' ? '#0d0d18' : '#f2eeec',
-        logging: false,
-        imageTimeout: 0,
+      // ── ヘルパー ──────────────────────────────────────
+      // rgba文字列をそのまま使えるようにパース不要、ctx.fillStyle に直接代入
+      const fillRect = (x, y, w, h, color) => {
+        ctx.fillStyle = color; ctx.fillRect(x, y, w, h)
+      }
+      const roundRect = (x, y, w, h, r, fill, stroke) => {
+        ctx.beginPath()
+        ctx.moveTo(x + r, y)
+        ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r)
+        ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
+        ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r)
+        ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r)
+        ctx.closePath()
+        if (fill)  { ctx.fillStyle = fill;   ctx.fill() }
+        if (stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke() }
+      }
+      const text = (str, x, y, font, color, align = 'left') => {
+        ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align
+        ctx.fillText(str, x, y)
+      }
+      const loadImg = (src) => new Promise((res, rej) => {
+        const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src
       })
 
-      const dataUrl = canvas.toDataURL('image/png')
+      // ── 背景 ──────────────────────────────────────────
+      fillRect(0, 0, W, H, t.cardBg)
+
+      // ── スクショエリア (0〜300px) ─────────────────────
+      if (player.screenshotDataUrl) {
+        const img = await loadImg(player.screenshotDataUrl)
+        // cover + center-top クロップ
+        const srcR = img.width / img.height, tgtR = W / 300
+        let sx, sy, sw, sh
+        if (srcR > tgtR) { sh = img.height; sw = sh * tgtR; sy = 0; sx = (img.width - sw) / 2 }
+        else             { sw = img.width;  sh = sw / tgtR;  sx = 0; sy = 0 }
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, 300)
+      } else {
+        // NO IMAGE グラデ
+        const grad = ctx.createLinearGradient(0, 0, W, 300)
+        if (theme === 'dark') {
+          grad.addColorStop(0, '#0d0d30'); grad.addColorStop(0.5, '#1a0a2e'); grad.addColorStop(1, '#0a1520')
+        } else {
+          grad.addColorStop(0, '#f0e8f0'); grad.addColorStop(0.5, '#e8d8e8'); grad.addColorStop(1, '#d8e8f0')
+        }
+        fillRect(0, 0, W, 300, grad)
+        text('NO IMAGE', W/2, 158, '13px "Noto Sans JP"', t.label, 'center')
+      }
+
+      // スクショ下グラデオーバーレイ
+      const fadeGrad = ctx.createLinearGradient(0, 140, 0, 300)
+      fadeGrad.addColorStop(0, 'transparent')
+      fadeGrad.addColorStop(0.7, t.cardBg + 'cc')
+      fadeGrad.addColorStop(1,   t.cardBg)
+      fillRect(0, 140, W, 160, fadeGrad)
+
+      // プレイヤー名エリア（スクショ下部）
+      text('Crystal Conflict Player', 18, 252, '600 10px "Barlow Condensed"', ac)
+      const fullName = ((player.firstName || 'First') + ' ' + (player.lastName || 'Last')).trim()
+      text(fullName, 18, 283, '700 28px "Barlow Condensed"', t.playerNameColor)
+      if (player.nickname) text(player.nickname, 18, 298, '13px "Noto Sans JP"', t.value)
+
+      // ランクバッジ
+      const rank = player.highestRank
+      if (rank) {
+        roundRect(W - 84, 12, 70, 54, 10, t.rankBadgeBg, ac + '66')
+        text(RANK_CONFIG[rank]?.icon || '', W - 49, 42, '20px serif', '#fff', 'center')
+        text(rank, W - 49, 58, '700 11px "Noto Sans JP"', ac, 'center')
+      }
+
+      // トップアクセントライン
+      const lineGrad = ctx.createLinearGradient(0, 0, W, 0)
+      lineGrad.addColorStop(0, 'transparent'); lineGrad.addColorStop(0.5, ac); lineGrad.addColorStop(1, 'transparent')
+      fillRect(0, 0, W, 2, lineGrad)
+
+      // ── 情報エリア (300〜800px) ───────────────────────
+      let cy = 308  // 現在のy位置
+
+      // SERVER / TEAM ボックス
+      roundRect(16, cy, W - 32, 38, 8, t.sectionBg, t.border)
+      text('SERVER', 26, cy + 11, '700 9px "Barlow Condensed"', t.label)
+      text(player.server || '—', 26, cy + 27, '600 13px "Noto Sans JP"', t.value)
+      // 区切り線
+      ctx.strokeStyle = t.border; ctx.lineWidth = 1
+      ctx.beginPath(); ctx.moveTo(W/2, cy + 6); ctx.lineTo(W/2, cy + 32); ctx.stroke()
+      text('TEAM', W/2 + 12, cy + 11, '700 9px "Barlow Condensed"', t.label)
+      text(player.team || '—', W/2 + 12, cy + 27, '600 13px "Noto Sans JP"', t.value)
+      cy += 46
+
+      // JOBS
+      text('JOBS', 16, cy + 10, '600 11px "Barlow Condensed"', t.label)
+      cy += 14
+      // タグ描画ヘルパー
+      const drawTags = (tags, startY) => {
+        let tx = 16, ty = startY
+        tags.forEach(({ label, type }) => {
+          const pad = 8, fontSize = 9
+          ctx.font = `${type === 'main' ? 700 : 500} ${fontSize}px "Noto Sans JP"`
+          const tw = ctx.measureText(label).width + pad * 2
+          const tagW = Math.max(tw, 34), tagH = 16
+          if (tx + tagW > W - 16) { tx = 16; ty += tagH + 4 }
+          let bg, border, fg
+          if (type === 'main')     { bg = t.inactiveTagBg; border = ac + '88'; fg = ac }
+          else if (type === 'sub') { bg = ac + '22';       border = ac + '88'; fg = ac }
+          else                     { bg = t.inactiveTagBg; border = t.inactiveTagBorder; fg = t.inactiveTagText }
+          roundRect(tx, ty, tagW, tagH, 8, bg, border)
+          text(label, tx + tagW/2, ty + tagH - 4, `${type === 'main' ? 700 : 500} ${fontSize}px "Noto Sans JP"`, fg, 'center')
+          tx += tagW + 4
+        })
+        return ty + 20
+      }
+      const jobTags = ALL_JOBS.map(j => ({
+        label: j === player.mainJob ? '★ ' + j : j,
+        type: j === player.mainJob ? 'main' : player.subJobs.includes(j) ? 'sub' : 'inactive'
+      }))
+      cy = drawTags(jobTags, cy)
+      cy += 4
+
+      // PLAY STYLE
+      text('PLAY STYLE', 16, cy + 10, '600 11px "Barlow Condensed"', t.label)
+      cy += 14
+      const psTags = PLAYSTYLE_LIST.map(ps => ({
+        label: ps, type: player.playstyle.includes(ps) ? 'sub' : 'inactive'
+      }))
+      cy = drawTags(psTags, cy)
+      cy += 4
+
+      // NOTE
+      text('NOTE', 16, cy + 10, '600 11px "Barlow Condensed"', t.label)
+      cy += 14
+      roundRect(16, cy, W - 32, 52, 8, t.noteBg, t.noteBorder)
+      if (player.freeText) {
+        ctx.font = '11px "Noto Sans JP"'; ctx.fillStyle = t.value; ctx.textAlign = 'left'
+        const lines = []
+        let line = ''
+        for (const ch of player.freeText) {
+          if (ch === '\n') { lines.push(line); line = '' }
+          else if (ctx.measureText(line + ch).width > W - 64) { lines.push(line); line = ch }
+          else line += ch
+        }
+        lines.push(line)
+        lines.slice(0, 3).forEach((l, i) => ctx.fillText(l, 26, cy + 16 + i * 17))
+      }
+      cy += 60
+
+      // SNS タグ
+      const snsTags = SNS_LIST.map(s => ({ label: s, type: player.sns.includes(s) ? 'sub' : 'inactive' }))
+      cy = drawTags(snsTags, cy)
+      cy += 4
+
+      // フッター
+      ctx.strokeStyle = t.border; ctx.lineWidth = 1
+      ctx.beginPath(); ctx.moveTo(16, cy); ctx.lineTo(W - 16, cy); ctx.stroke()
+      cy += 8
+      text('CC PLAYER CARD', 16, cy + 10, '700 11px "Barlow Condensed"', ac)
+      text('FINAL FANTASY XIV © SQUARE ENIX', 16, cy + 22, '9px "Barlow Condensed"', t.label)
+
+      const dataUrl = cv.toDataURL('image/png')
       setCardImgSrc(dataUrl)
       setShowSave(true)
     } catch (err) {
       console.error('render error:', err)
       alert('画像生成に失敗しました。再試行してください。')
     } finally {
-      // imgElのsrcとstyleを元に戻す
-      const imgEl = cardRef.current?.querySelector('img[data-screenshot]')
-      if (imgEl && player.screenshotDataUrl) {
-        imgEl.src = player.screenshotDataUrl
-        imgEl.style.objectFit = 'cover'
-        imgEl.style.objectPosition = 'center top'
-      }
       setGenerating(false)
     }
   }, [player, theme])
