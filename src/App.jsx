@@ -243,8 +243,11 @@ function PlayerCard({ player, theme, cardRef }) {
       {/* スクショ 300px */}
       <div style={{ position: 'relative', height: '300px', overflow: 'hidden' }}>
         {player.screenshotDataUrl ? (
-          <img data-screenshot src={player.screenshotDataUrl} alt="ss"
-            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
+          <div data-screenshot style={{
+            width: '100%', height: '100%',
+            backgroundImage: `url(${player.screenshotDataUrl})`,
+            backgroundSize: 'cover', backgroundPosition: 'center top', backgroundRepeat: 'no-repeat',
+          }} />
         ) : (
           <div style={{
             width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -575,7 +578,7 @@ function CardView({ player, theme, onEdit }) {
         scale: 2,
         useCORS: false,
         allowTaint: true,
-        backgroundColor: null,
+        backgroundColor: theme === 'dark' ? '#0d0d18' : '#f2eeec',
         logging: false,
         imageTimeout: 0,
       })
@@ -589,7 +592,7 @@ function CardView({ player, theme, onEdit }) {
     } finally {
       setGenerating(false)
     }
-  }, [player])
+  }, [player, theme])
 
   // 自動生成なし：ユーザーがボタンを押したときのみ生成
 
