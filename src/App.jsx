@@ -541,11 +541,29 @@ function CardView({ player, theme, onEdit }) {
     setGenerating(true)
     setCardImgSrc(null)
     try {
-      await new Promise(r => setTimeout(r, 200))
+      await document.fonts.ready
+      // DOM内のスクショ画像が完全に表示されるまで待つ
+      if (player.screenshotDataUrl) {
+        const imgEl = cardRef.current.querySelector('img[data-screenshot]')
+        if (imgEl) {
+          // 画像のsrcがセットされて描画完了するまでポーリング
+          await new Promise(resolve => {
+            const check = () => {
+              if (imgEl.complete && imgEl.naturalWidth > 0) {
+                resolve()
+              } else {
+                requestAnimationFrame(check)
+              }
+            }
+            check()
+            setTimeout(resolve, 5000) // 最大5秒
+          })
+          try { await imgEl.decode() } catch(e) {}
+        }
+      }
+      // レンダリング安定待ち
+      await new Promise(r => setTimeout(r, 400))
       const { default: domtoimage } = await import('dom-to-image-more')
-      const imgEl = cardRef.current.querySelector('img[data-screenshot]')
-      if (imgEl) { try { await imgEl.decode() } catch(e) {} }
-      await new Promise(r => setTimeout(r, 100))
       const dataUrl = await domtoimage.toPng(cardRef.current, { scale: 2, cacheBust: true })
       setCardImgSrc(dataUrl)
       setShowSave(true)
@@ -557,27 +575,11 @@ function CardView({ player, theme, onEdit }) {
     }
   }, [player])
 
-  // スクショ画像が読み込まれてから生成開始
-  const [imgReady, setImgReady] = React.useState(false)
-
+  // マウント時に自動生成開始
   React.useEffect(() => {
-    if (!player.screenshotDataUrl) {
-      // 画像なしの場合はすぐ開始
-      setImgReady(true)
-      return
-    }
-    // dataURLの場合は事前にImageオブジェクトで読み込み確認
-    const img = new Image()
-    img.onload = () => setImgReady(true)
-    img.onerror = () => setImgReady(true)
-    img.src = player.screenshotDataUrl
-  }, [player.screenshotDataUrl])
-
-  React.useEffect(() => {
-    if (!imgReady) return
-    const timer = setTimeout(() => { handleRenderCard() }, 200)
+    const timer = setTimeout(() => { handleRenderCard() }, 300)
     return () => clearTimeout(timer)
-  }, [imgReady])
+  }, [])
 
   // ファイル名生成 cc-card-FirstLast-dark/white
   const getFileName = () => {
