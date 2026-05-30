@@ -541,49 +541,46 @@ function CardView({ player, theme, onEdit }) {
     setGenerating(true)
     setCardImgSrc(null)
 
-    // rAFをN回待つユーティリティ
-    const waitFrames = (n = 2) => new Promise(resolve => {
-      let count = 0
-      const tick = () => { if (++count >= n) resolve(); else requestAnimationFrame(tick) }
-      requestAnimationFrame(tick)
-    })
-
     try {
       await document.fonts.ready
-      const { default: domtoimage } = await import('dom-to-image-more')
-      const imgEl = cardRef.current.querySelector('img[data-screenshot]')
 
-      if (imgEl && player.screenshotDataUrl) {
-        // ① オフスクリーンImageで確実にデコード完了させる
-        await new Promise(resolve => {
-          const cacheImg = new Image()
-          cacheImg.onload = async () => {
-            try { await cacheImg.decode() } catch(e) {}
+      // スクショがある場合：html2canvas用にImageオブジェクトへ事前デコード
+      if (player.screenshotDataUrl) {
+        await new Promise((resolve, reject) => {
+          const img = new Image()
+          img.onload = async () => {
+            try { await img.decode() } catch(e) {}
             resolve()
           }
-          cacheImg.onerror = resolve
-          cacheImg.src = player.screenshotDataUrl
+          img.onerror = reject
+          img.src = player.screenshotDataUrl
         })
-
-        // ② DOM上の<img>のdecodeも待つ
-        try { await imgEl.decode() } catch(e) {}
-
-        // ③ iOSコンポジットレイヤーへの描画を待つ（2フレーム）
-        await waitFrames(2)
       }
 
-      // ④ レンダリング安定待ち
-      await new Promise(r => setTimeout(r, 300))
-
-      // ⑤ iOSウォームアップ：1回空キャプチャしてGPUキャッシュを確定させる
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
-      if (isIOS && player.screenshotDataUrl) {
-        try { await domtoimage.toPng(cardRef.current, { scale: 1, cacheBust: true }) } catch(e) {}
-        await waitFrames(2)
+      // html2canvas を動的ロード（未ロードなら scriptタグで注入）
+      if (!window.html2canvas) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script')
+          s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'
+          s.onload = resolve
+          s.onerror = reject
+          document.head.appendChild(s)
+        })
       }
+      const html2canvas = window.html2canvas
 
-      // ⑥ 本番キャプチャ
-      const dataUrl = await domtoimage.toPng(cardRef.current, { scale: 2, cacheBust: true })
+      // html2canvas でキャプチャ
+      // useCORS不要（base64 dataURLは同一オリジン扱い）、allowTaint:trueで確実に描画
+      const canvas = await html2canvas(cardRef.current, {
+        scale: 2,
+        useCORS: false,
+        allowTaint: true,
+        backgroundColor: null,
+        logging: false,
+        imageTimeout: 0,
+      })
+
+      const dataUrl = canvas.toDataURL('image/png')
       setCardImgSrc(dataUrl)
       setShowSave(true)
     } catch (err) {
