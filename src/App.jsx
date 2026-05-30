@@ -1,708 +1,667 @@
-import React, { useState, useRef } from "react";
-import domtoimage from "dom-to-image-more";
+import React, { useState, useRef, useCallback } from 'react'
 
-const JOB_LIST = [
-  "ナイト","戦士","暗黒騎士","ガンブレイカー",
-  "白魔道士","学者","占星術師","賢者",
-  "モンク","竜騎士","忍者","侍","リーパー","ヴァイパー",
-  "吟遊詩人","機工士","踊り子",
-  "黒魔道士","召喚士","赤魔道士","ピクトマンサー"
-];
+const JOB_LIST = {
+  タンク: ['ナイト', '戦士', '暗黒騎士', 'ガンブレイカー'],
+  ヒーラー: ['白魔道士', '学者', '占星術師', '賢者'],
+  近接DPS: ['モンク', '竜騎士', '忍者', '侍', 'リーパー', 'ヴァイパー'],
+  遠隔DPS: ['吟遊詩人', '機工士', '踊り子'],
+  魔法DPS: ['黒魔道士', '召喚士', '赤魔道士', 'ピクトマンサー'],
+}
+const ALL_JOBS = Object.values(JOB_LIST).flat()
+const PLAYSTYLE_LIST = ['ターゲッター', 'サポート重視', '火力重視', 'オールラウンダー', 'クリスタル運びます！', '粘り型']
+const SNS_LIST = ['X', 'YouTube', 'Twitch']
+const RANK_LIST = ['アルテマ', 'オメガ', 'クリスタル', 'ダイヤモンド', 'プラチナ', 'ゴールド', 'シルバー', 'ブロンズ']
+const RANK_CONFIG = {
+  アルテマ:    { icon: '🌟' },
+  オメガ:      { icon: '⚡' },
+  クリスタル:  { icon: '💎' },
+  ダイヤモンド:{ icon: '🔷' },
+  プラチナ:    { icon: '🩶' },
+  ゴールド:    { icon: '🥇' },
+  シルバー:    { icon: '🥈' },
+  ブロンズ:    { icon: '🥉' },
+}
+const DC_SERVERS = {
+  Mana:      ['Anima', 'Asura', 'Chocobo', 'Hades', 'Ixion', 'Masamune', 'Pandemonium', 'Titan'],
+  Gaia:      ['Alexander', 'Bahamut', 'Durandal', 'Fenrir', 'Ifrit', 'Ridill', 'Tiamat', 'Ultima'],
+  Meteor:    ['Berias', 'Mandragora', 'Ramuh', 'Shinryu', 'Unicorn', 'Valefor', 'Yojimbo', 'Zeromus'],
+  Elemental: ['Aegis', 'Atomos', 'Carbuncle', 'Garuda', 'Gungnir', 'Kujata', 'Tonberry', 'Typhon'],
+}
+const emptyPlayer = {
+  firstName: '', lastName: '', nickname: '', server: '',
+  mainJob: '', subJobs: [], highestRank: '', playstyle: [],
+  team: '', screenshotDataUrl: '', freeText: '', sns: [],
+}
 
-const RANK_LIST = ["アルテマ","オメガ","クリスタル","ダイヤモンド","プラチナ","ゴールド","シルバー","ブロンズ"];
+const DARK_COLOR  = '#a8d8ea'
+const LIGHT_COLOR = '#e87db0'
 
-const PLAYSTYLE_LIST = [
-  "ターゲッター","サポート重視","火力重視",
-  "オールラウンダー","クリスタル運びます！","粘り型"
-];
-
-const DC_LIST = [
-  { label: "─── Mana ───", value: "", disabled: true },
-  { label: "Anima (Mana)", value: "Anima (Mana)" },
-  { label: "Asura (Mana)", value: "Asura (Mana)" },
-  { label: "Chocobo (Mana)", value: "Chocobo (Mana)" },
-  { label: "Hades (Mana)", value: "Hades (Mana)" },
-  { label: "Ixion (Mana)", value: "Ixion (Mana)" },
-  { label: "Masamune (Mana)", value: "Masamune (Mana)" },
-  { label: "Pandemonium (Mana)", value: "Pandemonium (Mana)" },
-  { label: "Titan (Mana)", value: "Titan (Mana)" },
-  { label: "─── Gaia ───", value: "", disabled: true },
-  { label: "Alexander (Gaia)", value: "Alexander (Gaia)" },
-  { label: "Bahamut (Gaia)", value: "Bahamut (Gaia)" },
-  { label: "Durandal (Gaia)", value: "Durandal (Gaia)" },
-  { label: "Fenrir (Gaia)", value: "Fenrir (Gaia)" },
-  { label: "Ifrit (Gaia)", value: "Ifrit (Gaia)" },
-  { label: "Ridill (Gaia)", value: "Ridill (Gaia)" },
-  { label: "Tiamat (Gaia)", value: "Tiamat (Gaia)" },
-  { label: "Ultima (Gaia)", value: "Ultima (Gaia)" },
-  { label: "─── Meteor ───", value: "", disabled: true },
-  { label: "Berias (Meteor)", value: "Berias (Meteor)" },
-  { label: "Mandragora (Meteor)", value: "Mandragora (Meteor)" },
-  { label: "Ramuh (Meteor)", value: "Ramuh (Meteor)" },
-  { label: "Shinryu (Meteor)", value: "Shinryu (Meteor)" },
-  { label: "Unicorn (Meteor)", value: "Unicorn (Meteor)" },
-  { label: "Valefor (Meteor)", value: "Valefor (Meteor)" },
-  { label: "Yojimbo (Meteor)", value: "Yojimbo (Meteor)" },
-  { label: "Zeromus (Meteor)", value: "Zeromus (Meteor)" },
-  { label: "─── Elemental ───", value: "", disabled: true },
-  { label: "Aegis (Elemental)", value: "Aegis (Elemental)" },
-  { label: "Atomos (Elemental)", value: "Atomos (Elemental)" },
-  { label: "Carbuncle (Elemental)", value: "Carbuncle (Elemental)" },
-  { label: "Garuda (Elemental)", value: "Garuda (Elemental)" },
-  { label: "Gungnir (Elemental)", value: "Gungnir (Elemental)" },
-  { label: "Kujata (Elemental)", value: "Kujata (Elemental)" },
-  { label: "Tonberry (Elemental)", value: "Tonberry (Elemental)" },
-  { label: "Typhon (Elemental)", value: "Typhon (Elemental)" },
-];
-
-const RANK_COLOR = {
-  "オメガ":"#ff9de2","アルテマ":"#ffd700","クリスタル":"#a8d8ea",
-  "ダイヤモンド":"#b8c8ff","プラチナ":"#c8e6c9","ゴールド":"#ffe082",
-  "シルバー":"#b0b0b0","ブロンズ":"#ffcc80",
-};
-const RANK_COLOR_LIGHT = {
-  "オメガ":"#d63faa","アルテマ":"#b8860b","クリスタル":"#2a7fa0",
-  "ダイヤモンド":"#4455cc","プラチナ":"#3a8a5a","ゴールド":"#b8860b",
-  "シルバー":"#666666","ブロンズ":"#a0622a",
-};
-const RANK_ICON = {
-  "オメガ":"⚡","アルテマ":"🌟","クリスタル":"💎","ダイヤモンド":"🔷",
-  "プラチナ":"🩶","ゴールド":"🥇","シルバー":"🥈","ブロンズ":"🥉",
-};
-
-const THEMES = {
+const THEME = {
   dark: {
-    id:"dark", label:"🌙 ダーク",
-    cardBg:"#0d0d18", pageBg:"#070710",
-    screenshotBg:"#0a0a14",
-    gradientColor:"#0d0d18",
-    infoBorder:()=>"#a8d8ea22", infoGridBg:()=>"#a8d8ea18",
-    labelColor:"#ffffff33", valueColor:"#ffffffcc",
-    tournamentBorder:"rgba(255,255,255,0.06)",
-    footerBorder:()=>"#a8d8ea18", footerText:"#ffffff1a",
-    badgeBg:"#0d0d18cc", badgeBorder:()=>"#a8d8ea66",
-    saveBtnBg:()=>"#a8d8ea18", saveBtnBorder:()=>"#a8d8ea44", saveBtnColor:()=>"#a8d8ea",
-    editBtnBg:"rgba(255,255,255,0.07)", editBtnBorder:"rgba(255,255,255,0.15)", editBtnColor:"#ffffffaa",
-    rankColor:(rank)=>RANK_COLOR[rank]||"#a8d8ea",
-    itemBg:"rgba(13,13,24,0.75)",
-    activeTagBg:"#a8d8ea18", activeTagBorder:"#a8d8ea55", activeTagColor:"#a8d8ea",
-    inactiveTagBg:"rgba(13,13,24,0.4)", inactiveTagBorder:"rgba(255,255,255,0.07)", inactiveTagColor:"rgba(255,255,255,0.18)",
+    cardBg: '#0d0d18', pageBg: '#070710',
+    label: 'rgba(255,255,255,0.35)', value: 'rgba(255,255,255,0.85)',
+    activeTag: DARK_COLOR, activeTagMainText: '#0a0a15',
+    inactiveTagBg: 'rgba(255,255,255,0.06)', inactiveTagBorder: 'rgba(255,255,255,0.15)',
+    inactiveTagText: 'rgba(255,255,255,0.45)',
+    border: 'rgba(255,255,255,0.1)', sectionBg: 'rgba(255,255,255,0.04)',
+    inputBg: 'rgba(255,255,255,0.07)', inputBorder: 'rgba(255,255,255,0.15)',
+    inputText: 'rgba(255,255,255,0.85)', buttonBg: DARK_COLOR, buttonText: '#0d1a20',
+    accentColor: DARK_COLOR,
+    rankBadgeBg: 'rgba(0,0,0,0.65)',
+    playerNameColor: '#ffffff',
+    noteBg: 'rgba(255,255,255,0.04)', noteBorder: 'rgba(255,255,255,0.1)',
+    selectBg: 'rgba(255,255,255,0.07)', selectBorder: 'rgba(255,255,255,0.15)',
+    selectText: 'rgba(255,255,255,0.85)', selectHover: 'rgba(168,216,234,0.12)',
+    selectActive: 'rgba(168,216,234,0.2)', dropdownBg: '#181830',
+    dropdownBorder: 'rgba(168,216,234,0.25)', groupLabel: 'rgba(168,216,234,0.45)',
+    deleteBg: 'rgba(255,80,80,0.12)', deleteBorder: 'rgba(255,80,80,0.35)', deleteText: '#ff8888',
+    themeBtnActiveBg: 'rgba(255,255,255,0.15)', themeBtnInactiveBg: 'transparent',
+    themeBtnActiveText: '#ffffff', themeBtnInactiveText: 'rgba(255,255,255,0.4)',
+    themeBtnBorder: 'rgba(255,255,255,0.15)',
   },
   light: {
-    id:"light", label:"☁️ ライト",
-    cardBg:"#f0f0ec", pageBg:"#e8e8e2",
-    screenshotBg:"#e8e8e4",
-    gradientColor:"#f0f0ec",
-    infoBorder:()=>"#d63faa44", infoGridBg:()=>"#d63faa18",
-    labelColor:"#888888", valueColor:"#222233",
-    tournamentBorder:"rgba(0,0,0,0.08)",
-    footerBorder:()=>"#d63faa33", footerText:"#aaaaaa",
-    badgeBg:"#f5f5f0ee", badgeBorder:()=>"#d63faa88",
-    saveBtnBg:()=>"#d63faa22", saveBtnBorder:()=>"#d63faa88", saveBtnColor:()=>"#d63faa",
-    editBtnBg:"rgba(0,0,0,0.06)", editBtnBorder:"rgba(0,0,0,0.15)", editBtnColor:"#444455",
-    rankColor:(rank)=>RANK_COLOR_LIGHT[rank]||"#2a7fa0",
-    itemBg:"rgba(245,245,240,0.85)",
-    activeTagBg:"#d63faa18", activeTagBorder:"#d63faa55", activeTagColor:"#d63faa",
-    inactiveTagBg:"rgba(245,245,240,0.5)", inactiveTagBorder:"rgba(0,0,0,0.08)", inactiveTagColor:"rgba(0,0,0,0.2)",
+    cardBg: '#f2eeec', pageBg: '#e8e4e2',
+    label: '#aaa', value: '#2a2a3a',
+    activeTag: LIGHT_COLOR, activeTagMainText: '#ffffff',
+    inactiveTagBg: 'rgba(0,0,0,0.04)', inactiveTagBorder: 'rgba(0,0,0,0.12)',
+    inactiveTagText: 'rgba(0,0,0,0.38)',
+    border: 'rgba(0,0,0,0.1)', sectionBg: 'rgba(255,255,255,0.75)',
+    inputBg: 'rgba(255,255,255,0.9)', inputBorder: 'rgba(0,0,0,0.12)',
+    inputText: '#2a2a3a', buttonBg: LIGHT_COLOR, buttonText: '#ffffff',
+    accentColor: LIGHT_COLOR,
+    rankBadgeBg: 'rgba(255,255,255,0.92)',
+    playerNameColor: '#111122',
+    noteBg: 'rgba(255,255,255,0.85)', noteBorder: 'rgba(0,0,0,0.1)',
+    selectBg: 'rgba(255,255,255,0.9)', selectBorder: 'rgba(0,0,0,0.12)',
+    selectText: '#2a2a3a', selectHover: 'rgba(232,125,176,0.1)',
+    selectActive: 'rgba(232,125,176,0.18)', dropdownBg: '#fff8fb',
+    dropdownBorder: 'rgba(232,125,176,0.3)', groupLabel: 'rgba(200,100,150,0.55)',
+    deleteBg: 'rgba(220,50,50,0.07)', deleteBorder: 'rgba(220,50,50,0.25)', deleteText: '#cc4444',
+    themeBtnActiveBg: 'rgba(0,0,0,0.1)', themeBtnInactiveBg: 'transparent',
+    themeBtnActiveText: '#2a2a3a', themeBtnInactiveText: 'rgba(0,0,0,0.35)',
+    themeBtnBorder: 'rgba(0,0,0,0.12)',
   },
-};
+}
 
-const emptyPlayer = {
-  firstName:"",lastName:"",nickname:"",server:"",mainJob:"",
-  subJobs:[],highestRank:"",playstyle:[],team:"",
-  screenshotDataUrl:"",freeText:"",sns:[],
-};
-
-// ===================== CARD VIEW =====================
-// カードは 420×800px 固定。情報エリアはこの中に収める。
-const CARD_W = 420;
-const CARD_H = 800;
-const PHOTO_H = 300; // スクショエリアの高さ
-
-function PlayerCard({ player, theme, onEdit }) {
-  const t = THEMES[theme] || THEMES.dark;
-  const rc = t.rankColor(player.highestRank);
-  const cardRef = useRef(null);
-  const fullName = [player.firstName, player.lastName].filter(Boolean).join(" ");
-
-  // PNG保存はボタン不要。
-  // dom-to-image-more でレンダリングした PNG を cardImgSrc に格納し、
-  // <img> タグで表示する。ユーザーは右クリック（PC）or 長押し（スマホ）で保存。
-  const [cardImgSrc, setCardImgSrc] = useState(null);
-  const [rendering, setRendering] = useState(false);
-
-  const handleRenderCard = async () => {
-    if (!cardRef.current) return;
-    setRendering(true);
-    await document.fonts.ready;
-    await new Promise(r => setTimeout(r, 200));
-
-    let blobUrl = null;
-    let bgImg = null;
-    if (player.screenshotDataUrl) {
-      try {
-        const res  = await fetch(player.screenshotDataUrl);
-        const blob = await res.blob();
-        blobUrl = URL.createObjectURL(blob);
-        bgImg = cardRef.current.querySelector("[data-screenshot]");
-        if (bgImg) bgImg.src = blobUrl;
-        await new Promise((resolve) => {
-          const tmp = new Image();
-          tmp.onload = resolve; tmp.onerror = resolve;
-          tmp.src = blobUrl;
-        });
-        await new Promise(r => setTimeout(r, 150));
-      } catch(e) {
-        console.warn("Blob URL変換失敗、そのまま続行:", e);
-      }
+const GlobalStyle = () => (
+  <style>{`
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Rajdhani', 'Noto Sans JP', sans-serif; }
+    @keyframes shimmer {
+      0%   { background-position: -200% center; }
+      100% { background-position:  200% center; }
     }
-
-    let dataURL = null;
-    try {
-      dataURL = await domtoimage.toPng(cardRef.current, {
-        scale: 2,
-        cacheBust: true,
-      });
-    } catch(e) {
-      alert("画像の生成に失敗しました。");
-      console.error(e);
-    } finally {
-      if (blobUrl && bgImg) {
-        bgImg.src = player.screenshotDataUrl;
-        URL.revokeObjectURL(blobUrl);
-      }
-      setRendering(false);
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes dropDown {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    input, textarea { font-family: 'Noto Sans JP', sans-serif; }
+  `}</style>
+)
 
-    if (dataURL) setCardImgSrc(dataURL);
-  };
-
-  // タグ共通スタイル
-  const tag = (active) => ({
-    padding: ".1rem .4rem",
-    background: active ? t.activeTagBg : t.inactiveTagBg,
-    border: `1px solid ${active ? t.activeTagBorder : t.inactiveTagBorder}`,
-    borderRadius: "999px", fontSize: ".58rem",
-    color: active ? t.activeTagColor : t.inactiveTagColor,
-    fontFamily: "'Noto Sans JP', sans-serif",
-    whiteSpace: "nowrap",
-  });
-
+function ThemeToggle({ theme, onToggle }) {
+  const t = THEME[theme]
   return (
     <div style={{
-      minHeight:"100vh", background:t.pageBg,
-      display:"flex", flexDirection:"column", alignItems:"center",
-      justifyContent:"flex-start", padding:"2rem 1rem 3rem",
-      fontFamily:"'Rajdhani','Noto Sans JP',sans-serif",
+      display: 'flex', background: t.inactiveTagBg,
+      border: `1px solid ${t.themeBtnBorder}`, borderRadius: '24px', padding: '3px', gap: '2px',
     }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
-        @keyframes shimmer{0%{background-position:-400% center}100%{background-position:400% center}}
-        @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-        .cc-card{animation:fadeUp .5s ease forwards}
-        .cc-btn:hover{opacity:.8!important;transform:translateY(-1px)}
-      `}</style>
+      {[{ key: 'dark', label: '🌙 ダーク' }, { key: 'light', label: '☁️ ライト' }].map(({ key, label }) => (
+        <button key={key} onClick={() => onToggle(key)} style={{
+          padding: '5px 14px', borderRadius: '20px', border: 'none', cursor: 'pointer',
+          fontSize: '13px', fontFamily: "'Noto Sans JP',sans-serif",
+          background: theme === key ? t.themeBtnActiveBg : t.themeBtnInactiveBg,
+          color: theme === key ? t.themeBtnActiveText : t.themeBtnInactiveText,
+          fontWeight: theme === key ? 600 : 400,
+          transition: 'all 0.2s ease',
+        }}>{label}</button>
+      ))}
+    </div>
+  )
+}
 
-      {/* ── カード本体：幅420px・高さ800px 固定 ── */}
-      <div className="cc-card" ref={cardRef} style={{
-        width:`${CARD_W}px`, height:`${CARD_H}px`,
-        position:"relative", overflow:"hidden",
-        background:t.cardBg,
-        boxShadow: theme==="dark"
-          ? "0 0 60px #a8d8ea18,0 20px 60px #00000080"
-          : "0 0 40px #d63faa22,0 12px 40px #00000018",
-        flexShrink:0,
+function CustomSelect({ value, onChange, options, placeholder, theme }) {
+  const t = THEME[theme]
+  const [open, setOpen] = useState(false)
+  const ref = useRef()
+
+  React.useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    if (open) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const selectedLabel = (() => {
+    for (const g of options) {
+      if (g.items) { const f = g.items.find(i => i.value === value); if (f) return f.label }
+      else if (g.value === value) return g.label
+    }
+    return null
+  })()
+
+  return (
+    <div ref={ref} style={{ position: 'relative', userSelect: 'none' }}>
+      <div onClick={() => setOpen(o => !o)} style={{
+        width: '100%', background: t.selectBg, border: `1px solid ${open ? t.accentColor + '88' : t.selectBorder}`,
+        borderRadius: '8px', padding: '9px 36px 9px 12px', color: selectedLabel ? t.selectText : t.label,
+        fontSize: '14px', fontFamily: "'Noto Sans JP',sans-serif", cursor: 'pointer',
+        display: 'flex', alignItems: 'center', transition: 'border-color 0.15s', position: 'relative',
       }}>
-
-        {/* ── 上段：スクショ写真エリア（300px）── */}
-        {/* overflow:hidden は dom-to-image-more と相性問題があるため使わない */}
+        <span style={{ flex: 1, textAlign: 'left' }}>{selectedLabel || placeholder}</span>
+        <span style={{
+          position: 'absolute', right: '12px', color: t.accentColor, fontSize: '11px',
+          transform: `rotate(${open ? 180 : 0}deg)`, transition: 'transform 0.2s',
+        }}>▼</span>
+      </div>
+      {open && (
         <div style={{
-          position:"absolute", inset:0,
-          zIndex:0,
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 200,
+          background: t.dropdownBg, border: `1px solid ${t.dropdownBorder}`,
+          borderRadius: '10px', animation: 'dropDown 0.15s ease',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.25)', maxHeight: '260px', overflowY: 'auto',
         }}>
-          {player.screenshotDataUrl ? (
-            <img
-              data-screenshot="true"
-              src={player.screenshotDataUrl}
-              alt=""
-              crossOrigin="anonymous"
-              style={{
-                position:"absolute",
-                top:0, left:0,
-                width:`${CARD_W}px`,
-                height:`${PHOTO_H}px`,
-                objectFit:"cover",
-              }}
-            />
-          ) : (
-            <div style={{
-              position:"absolute", top:0, left:0,
-              width:`${CARD_W}px`, height:`${PHOTO_H}px`,
-              background:t.screenshotBg,
-            }}/>
-          )}
-          {/* 写真→情報エリアへのグラデ */}
-          <div style={{
-            position:"absolute", top:`${PHOTO_H - 100}px`, left:0, right:0, height:"100px",
-            background:`linear-gradient(to bottom, transparent, ${t.gradientColor})`,
-          }}/>
-        </div>
-
-        {/* 上部カラーライン */}
-        <div style={{
-          position:"absolute", top:0, left:0, right:0, height:"2px", zIndex:4,
-          background:`linear-gradient(90deg,transparent,${rc},transparent)`,
-          backgroundSize:"200% auto", animation:"shimmer 3s linear infinite",
-        }}/>
-
-        {/* ランクバッジ */}
-        <div style={{
-          position:"absolute", top:"1rem", right:"1rem", zIndex:4,
-          background:t.badgeBg, border:`1px solid ${t.badgeBorder(rc)}`,
-          borderRadius:"10px", padding:".4rem .8rem", textAlign:"center",
-          /* backdropFilter削除: Safari/dom-to-image-more で描画崩れの原因になるため */
-        }}>
-          <div style={{fontSize:"1.4rem",lineHeight:1}}>{RANK_ICON[player.highestRank]||"🎮"}</div>
-          <div style={{fontSize:".62rem",color:rc,fontWeight:700,fontFamily:"Rajdhani,sans-serif",letterSpacing:".08em",marginTop:".2rem"}}>
-            {player.highestRank||"—"}
-          </div>
-        </div>
-
-        {/* プレイヤー名（写真の下部に重ねる） */}
-        <div style={{
-          position:"absolute", top:"210px", left:"1.2rem", right:"5.5rem", zIndex:3,
-        }}>
-          <div style={{fontSize:".52rem",letterSpacing:".25em",color:theme==="dark"?"#a8d8eadd":"#b0006e",fontFamily:"Rajdhani,sans-serif",textTransform:"uppercase",marginBottom:".1rem"}}>
-            Crystal Conflict Player
-          </div>
-          <div style={{fontSize:"1.75rem",fontWeight:700,color:"#fff",fontFamily:"Rajdhani,sans-serif",lineHeight:1,textShadow:"0 2px 16px rgba(0,0,0,0.9),0 0 40px rgba(0,0,0,0.6)"}}>
-            {fullName||"—"}
-          </div>
-          {player.nickname&&(
-            <div style={{fontSize:".78rem",color:"#ffffffcc",fontFamily:"'Noto Sans JP',sans-serif",fontWeight:300,marginTop:".1rem",textShadow:"0 1px 8px rgba(0,0,0,0.9)"}}>
-              {player.nickname}
-            </div>
-          )}
-        </div>
-
-        {/* ── 下段：情報エリア（300px〜800px）── */}
-        <div style={{
-          position:"absolute", top:`${PHOTO_H}px`, left:0, right:0,
-          height:`${CARD_H - PHOTO_H}px`,
-          padding:".6rem 1.1rem .4rem",
-          display:"flex", flexDirection:"column",
-          zIndex:2, overflow:"hidden",
-        }}>
-
-          {/* SERVER / TEAM */}
-          <div style={{
-            display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1px",
-            background:t.infoGridBg(rc),
-            border:`1px solid ${t.infoBorder(rc)}`,
-            borderRadius:"8px", overflow:"hidden", marginBottom:".5rem", flexShrink:0,
-          }}>
-            {[{label:"SERVER",value:player.server},{label:"TEAM",value:player.team||"—"}].map(item=>(
-              <div key={item.label} style={{background:t.itemBg,padding:".25rem .6rem"/* backdropFilter削除 */}}>
-                <div style={{fontSize:".45rem",letterSpacing:".12em",color:t.labelColor,fontFamily:"Rajdhani,sans-serif",marginBottom:".05rem"}}>{item.label}</div>
-                <div style={{fontSize:".72rem",color:t.valueColor,fontFamily:"'Noto Sans JP',sans-serif",fontWeight:500}}>{item.value||"—"}</div>
+          {options.map((g, gi) => g.items ? (
+            <div key={gi}>
+              <div style={{ padding: '5px 12px 2px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', color: t.groupLabel, textTransform: 'uppercase', fontFamily: "'Rajdhani',sans-serif", textAlign: 'left' }}>
+                {g.label}
               </div>
-            ))}
-          </div>
-
-          {/* JOBS */}
-          <div style={{marginBottom:".4rem",flexShrink:0}}>
-            <div style={{fontSize:".45rem",letterSpacing:".15em",color:t.labelColor,fontFamily:"Rajdhani,sans-serif",marginBottom:".2rem",textTransform:"uppercase"}}>Jobs</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:".18rem"}}>
-              {JOB_LIST.map(j=>{
-                const isMain = j===player.mainJob;
-                const isActive = isMain||(player.subJobs||[]).includes(j);
-                return(
-                  <span key={j} style={{...tag(isActive),fontWeight:isMain?700:400}}>
-                    {isMain?"★ ":""}{j}
-                  </span>
-                );
+              {g.items.map((item, ii) => {
+                const active = item.value === value
+                return (
+                  <div key={ii} onClick={() => { onChange(item.value); setOpen(false) }}
+                    style={{ padding: '5px 12px 5px 16px', fontSize: '13px', fontFamily: "'Noto Sans JP',sans-serif", cursor: 'pointer', background: active ? t.selectActive : 'transparent', color: active ? t.accentColor : t.selectText, fontWeight: active ? 600 : 400, textAlign: 'left' }}
+                    onMouseEnter={e => { if (!active) e.currentTarget.style.background = t.selectHover }}
+                    onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
+                  >{active ? '✓ ' : ''}{item.label}</div>
+                )
               })}
+            </div>
+          ) : (
+            <div key={gi} onClick={() => { onChange(g.value); setOpen(false) }}
+              style={{ padding: '9px 14px', fontSize: '14px', fontFamily: "'Noto Sans JP',sans-serif", cursor: 'pointer', background: g.value === value ? t.selectActive : 'transparent', color: g.value === value ? t.accentColor : t.selectText, textAlign: 'left' }}
+              onMouseEnter={e => { if (g.value !== value) e.currentTarget.style.background = t.selectHover }}
+              onMouseLeave={e => { if (g.value !== value) e.currentTarget.style.background = 'transparent' }}
+            >{g.value === value ? '✓ ' : ''}{g.label}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SectionLabel({ children, theme }) {
+  const t = THEME[theme]
+  return (
+    <div style={{
+      fontSize: '11px', fontWeight: 600, letterSpacing: '0.15em',
+      color: t.label, textTransform: 'uppercase', marginBottom: '8px',
+      textAlign: 'left', fontFamily: "'Barlow Condensed',sans-serif",
+    }}>{children}</div>
+  )
+}
+
+function PlayerCard({ player, theme, cardRef }) {
+  const t = THEME[theme]
+  const rank = player.highestRank
+  const rankCfg = RANK_CONFIG[rank]
+  const ac = t.accentColor
+
+  const sectionLabel = {
+    fontFamily: "'Barlow Condensed',sans-serif", fontSize: '11px', fontWeight: 600,
+    letterSpacing: '0.15em', color: t.label, textTransform: 'uppercase',
+    marginBottom: '2px', textAlign: 'left',
+  }
+  const tagBase = {
+    display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: '20px',
+    fontSize: '9px', fontWeight: 500, fontFamily: "'Noto Sans JP',sans-serif",
+    border: '1px solid', margin: '2px', whiteSpace: 'nowrap', minWidth: '34px', justifyContent: 'center',
+  }
+  const activeTag   = { ...tagBase, background: ac + '22', borderColor: ac + '88', color: ac }
+  const inactiveTag = { ...tagBase, background: t.inactiveTagBg, borderColor: t.inactiveTagBorder, color: t.inactiveTagText }
+  const mainTag     = { ...tagBase, background: t.inactiveTagBg, borderColor: ac + '88', color: ac, fontWeight: 700 }
+
+  return (
+    <div ref={cardRef} style={{
+      width: '420px', height: '800px', background: t.cardBg, position: 'relative',
+      overflow: 'hidden', flexShrink: 0, animation: 'fadeUp 0.5s ease',
+      fontFamily: "'Barlow Condensed','Rajdhani','Noto Sans JP',sans-serif",
+    }}>
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: '2px', zIndex: 10,
+        background: `linear-gradient(90deg, transparent, ${ac}, ${ac}bb, ${ac}, transparent)`,
+        backgroundSize: '200% auto', animation: 'shimmer 3s linear infinite',
+      }} />
+
+      {/* スクショ 300px */}
+      <div style={{ position: 'relative', height: '300px', overflow: 'hidden' }}>
+        {player.screenshotDataUrl ? (
+          <img data-screenshot src={player.screenshotDataUrl} alt="ss"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
+        ) : (
+          <div style={{
+            width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: theme === 'dark'
+              ? 'linear-gradient(135deg,#0d0d30,#1a0a2e,#0a1520)'
+              : 'linear-gradient(135deg,#f0e8f0,#e8d8e8,#d8e8f0)',
+          }}>
+            <span style={{ color: t.label, fontSize: '13px', letterSpacing: '0.1em' }}>NO IMAGE</span>
+          </div>
+        )}
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, height: '160px', pointerEvents: 'none',
+          background: `linear-gradient(to top, ${t.cardBg} 0%, ${t.cardBg}cc 30%, transparent 100%)`,
+        }} />
+        <div style={{ position: 'absolute', bottom: '12px', left: '18px', right: '20px', textAlign: 'left' }}>
+          <div style={{ fontSize: '10px', letterSpacing: '0.2em', color: t.accentColor, fontWeight: 500, marginBottom: '1px', textTransform: 'uppercase', fontFamily: "'Barlow Condensed',sans-serif" }}>Crystal Conflict Player</div>
+          <div style={{ fontSize: '28px', fontWeight: 700, color: t.playerNameColor, lineHeight: 1.0, fontFamily: "'Barlow Condensed','Rajdhani',sans-serif" }}>
+            {player.firstName || 'First'} {player.lastName || 'Last'}
+          </div>
+          {player.nickname && <div style={{ fontSize: '13px', color: t.value, marginTop: '1px', fontFamily: "'Noto Sans JP',sans-serif" }}>{player.nickname}</div>}
+        </div>
+        {rank && (
+          <div style={{
+            position: 'absolute', top: '14px', right: '14px', background: t.rankBadgeBg,
+            border: `1px solid ${ac}66`, borderRadius: '10px', padding: '6px 10px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', minWidth: '56px',
+          }}>
+            <span style={{ fontSize: '20px', lineHeight: 1 }}>{rankCfg?.icon}</span>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: ac, letterSpacing: '0.05em', fontFamily: "'Noto Sans JP',sans-serif", whiteSpace: 'nowrap' }}>{rank}</span>
+          </div>
+        )}
+      </div>
+
+      {/* 情報エリア 500px */}
+      <div style={{ height: '500px', padding: '8px 16px 10px', display: 'flex', flexDirection: 'column', gap: '6px', overflow: 'hidden' }}>
+        <div style={{ background: t.sectionBg, border: `1px solid ${t.border}`, borderRadius: '8px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '0' }}>
+          {[{ label: 'SERVER', value: player.server || '—' }, { label: 'TEAM', value: player.team || '—' }].map(({ label, value }, i) => (
+            <div key={label} style={{ flex: 1, borderLeft: i === 1 ? `1px solid ${t.border}` : 'none', paddingLeft: i === 1 ? '12px' : '0', marginLeft: i === 1 ? '12px' : '0', textAlign: 'left' }}>
+              <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.15em', color: t.label, textTransform: 'uppercase', fontFamily: "'Barlow Condensed',sans-serif", marginBottom: '1px' }}>{label}</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: t.value, fontFamily: "'Noto Sans JP',sans-serif", lineHeight: 1.3 }}>{value}</div>
+            </div>
+          ))}
+        </div>
+        <div>
+          <div style={sectionLabel}>Jobs</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', margin: '-2px' }}>
+            {ALL_JOBS.map(job => {
+              const isMain = job === player.mainJob
+              const isSub = player.subJobs.includes(job)
+              return <span key={job} style={isMain ? mainTag : isSub ? activeTag : inactiveTag}>{isMain ? '★ ' : ''}{job}</span>
+            })}
+          </div>
+        </div>
+        <div>
+          <div style={sectionLabel}>Play Style</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', margin: '-2px' }}>
+            {PLAYSTYLE_LIST.map(ps => <span key={ps} style={player.playstyle.includes(ps) ? activeTag : inactiveTag}>{ps}</span>)}
+          </div>
+        </div>
+        <div>
+          <div style={sectionLabel}>Note</div>
+          <div style={{
+            background: t.noteBg, border: `1px solid ${t.noteBorder}`, borderRadius: '8px',
+            padding: '6px 10px', fontSize: '11px', color: player.freeText ? t.value : t.label,
+            fontFamily: "'Noto Sans JP',sans-serif", lineHeight: 1.55, height: '52px', overflow: 'hidden', textAlign: 'left',
+          }}>{player.freeText || ''}</div>
+        </div>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          {SNS_LIST.map(s => {
+            const snsTag = { ...(player.sns.includes(s) ? activeTag : inactiveTag), padding: '1px 6px', fontSize: '9px' }
+            return <span key={s} style={snsTag}>{s}</span>
+          })}
+        </div>
+        <div style={{ marginTop: '4px', borderTop: `1px solid ${t.border}`, paddingTop: '6px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: ac, textTransform: 'uppercase' }}>CC Player Card</div>
+          <div style={{ fontSize: '9px', color: t.label, marginTop: '1px', letterSpacing: '0.05em' }}>FINAL FANTASY XIV © SQUARE ENIX</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
+  const t = THEME[theme]
+  const [form, setForm] = useState({ ...initialData })
+  const fileRef = useRef()
+  const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
+  const toggleArr = (key, val) => setForm(f => {
+    const arr = f[key]
+    return { ...f, [key]: arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val] }
+  })
+  const handleFile = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => set('screenshotDataUrl', ev.target.result)
+    reader.readAsDataURL(file)
+  }
+
+  const inputStyle = {
+    width: '100%', background: t.inputBg, border: `1px solid ${t.inputBorder}`,
+    borderRadius: '8px', padding: '9px 12px', color: t.inputText,
+    fontSize: '14px', fontFamily: "'Noto Sans JP',sans-serif", outline: 'none',
+  }
+  const tagBtn = (active) => ({
+    display: 'inline-flex', alignItems: 'center', padding: '5px 12px', borderRadius: '20px',
+    fontSize: '13px', fontWeight: 500, fontFamily: "'Noto Sans JP',sans-serif",
+    border: `1px solid ${active ? t.activeTag + '88' : t.inactiveTagBorder}`,
+    background: active ? t.activeTag + '22' : t.inactiveTagBg,
+    color: active ? t.activeTag : t.inactiveTagText,
+    cursor: 'pointer', margin: '3px', transition: 'all 0.15s ease',
+  })
+
+  const serverOptions = Object.entries(DC_SERVERS).map(([dc, servers]) => ({
+    label: dc, items: servers.map(s => ({ label: `${s} (${dc})`, value: `${s} (${dc})` }))
+  }))
+  const jobOptions = Object.entries(JOB_LIST).map(([role, jobs]) => ({
+    label: role, items: jobs.map(j => ({ label: j, value: j }))
+  }))
+  const rankOptions = RANK_LIST.map(r => ({ label: `${RANK_CONFIG[r].icon} ${r}`, value: r }))
+
+  return (
+    <div style={{ minHeight: '100vh', background: t.pageBg, padding: '24px 16px 40px', color: t.value }}>
+      <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+
+        {/* ヘッダー */}
+        <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+          <div style={{ fontSize: '10px', letterSpacing: '0.2em', color: t.label, textTransform: 'uppercase', marginBottom: '2px' }}>CC Player Card</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: t.value, fontFamily: "'Noto Sans JP',sans-serif" }}>プロフィール編集</div>
+          <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+          {/* 名前 */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <SectionLabel theme={theme}>ファーストネーム</SectionLabel>
+              <input style={inputStyle} value={form.firstName} onChange={e => set('firstName', e.target.value)} placeholder="First Name" />
+            </div>
+            <div>
+              <SectionLabel theme={theme}>ラストネーム</SectionLabel>
+              <input style={inputStyle} value={form.lastName} onChange={e => set('lastName', e.target.value)} placeholder="Last Name" />
             </div>
           </div>
 
-          {/* PLAY STYLE */}
-          <div style={{marginBottom:".4rem",flexShrink:0}}>
-            <div style={{fontSize:".45rem",letterSpacing:".15em",color:t.labelColor,fontFamily:"Rajdhani,sans-serif",marginBottom:".2rem",textTransform:"uppercase"}}>Play Style</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:".18rem"}}>
-              {PLAYSTYLE_LIST.map(s=>{
-                const isActive=(player.playstyle||[]).includes(s);
-                return <span key={s} style={tag(isActive)}>{s}</span>;
-              })}
+          {/* 呼び名 */}
+          <div>
+            <SectionLabel theme={theme}>呼び名</SectionLabel>
+            <input style={inputStyle} value={form.nickname} onChange={e => set('nickname', e.target.value)} placeholder="" />
+          </div>
+
+          {/* サーバー */}
+          <div>
+            <SectionLabel theme={theme}>サーバー</SectionLabel>
+            <CustomSelect value={form.server} onChange={v => set('server', v)} options={serverOptions} placeholder="選択してください" theme={theme} />
+          </div>
+
+          {/* 最高ランク */}
+          <div>
+            <SectionLabel theme={theme}>最高ランク</SectionLabel>
+            <CustomSelect value={form.highestRank} onChange={v => set('highestRank', v)} options={rankOptions} placeholder="選択" theme={theme} />
+          </div>
+
+          {/* メインジョブ */}
+          <div>
+            <SectionLabel theme={theme}>メインジョブ</SectionLabel>
+            <CustomSelect value={form.mainJob} onChange={v => set('mainJob', v)} options={jobOptions} placeholder="選択" theme={theme} />
+          </div>
+
+          {/* 使用ジョブ */}
+          <div>
+            <SectionLabel theme={theme}>使用ジョブ（複数選択可）</SectionLabel>
+            <div style={{ display: 'flex', flexWrap: 'wrap', margin: '-3px' }}>
+              {ALL_JOBS.filter(j => j !== form.mainJob).map(j => (
+                <button key={j} onClick={() => toggleArr('subJobs', j)} style={tagBtn(form.subJobs.includes(j))}>{j}</button>
+              ))}
             </div>
+          </div>
+
+          {/* プレイスタイル */}
+          <div>
+            <SectionLabel theme={theme}>プレイスタイル</SectionLabel>
+            <div style={{ display: 'flex', flexWrap: 'wrap', margin: '-3px' }}>
+              {PLAYSTYLE_LIST.map(ps => (
+                <button key={ps} onClick={() => toggleArr('playstyle', ps)} style={tagBtn(form.playstyle.includes(ps))}>{ps}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* チーム */}
+          <div>
+            <SectionLabel theme={theme}>チーム</SectionLabel>
+            <input style={inputStyle} value={form.team} onChange={e => set('team', e.target.value)} placeholder="チーム名（任意）" />
+          </div>
+
+          {/* スクショ */}
+          <div>
+            <SectionLabel theme={theme}>スクリーンショット画像</SectionLabel>
+            <div style={{
+              background: t.accentColor + '12', border: `1px solid ${t.accentColor}40`,
+              borderRadius: '8px', padding: '8px 12px', marginBottom: '8px',
+              fontSize: '12px', color: t.value, fontFamily: "'Noto Sans JP',sans-serif",
+              display: 'flex', alignItems: 'center', gap: '8px',
+            }}>
+              <span>📐</span>
+              <span>推奨サイズ：横幅 1280px 以上・縦横比 4:3 〜 16:9 推奨</span>
+            </div>
+            {form.screenshotDataUrl ? (
+              <div>
+                {/* カードと同じ比率でプレビュー */}
+                <div style={{
+                  width: '100%', aspectRatio: '420 / 300', borderRadius: '10px',
+                  overflow: 'hidden', marginBottom: '8px', border: `1px solid ${t.border}`,
+                }}>
+                  <img src={form.screenshotDataUrl} alt="preview" style={{
+                    width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block',
+                  }} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <button onClick={() => fileRef.current.click()} style={{
+                    padding: '10px', background: t.inputBg, border: `1px solid ${t.inputBorder}`,
+                    borderRadius: '8px', color: t.value, fontSize: '13px', cursor: 'pointer',
+                    fontFamily: "'Noto Sans JP',sans-serif",
+                  }}>画像を変更</button>
+                  <button onClick={() => set('screenshotDataUrl', '')} style={{
+                    padding: '10px', background: t.deleteBg, border: `1px solid ${t.deleteBorder}`,
+                    borderRadius: '8px', color: t.deleteText, fontSize: '13px', cursor: 'pointer',
+                    fontFamily: "'Noto Sans JP',sans-serif",
+                  }}>削除</button>
+                </div>
+              </div>
+            ) : (
+              <div onClick={() => fileRef.current.click()} style={{
+                border: `2px dashed ${t.inactiveTagBorder}`, borderRadius: '10px',
+                padding: '32px 20px', textAlign: 'center', cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+              }}>
+                <span style={{ fontSize: '32px' }}>🖼️</span>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: t.value, fontFamily: "'Noto Sans JP',sans-serif" }}>クリックしてスクショを選択</span>
+                <span style={{ fontSize: '12px', color: t.label, fontFamily: "'Noto Sans JP',sans-serif" }}>JPG / PNG　推奨：1280px幅以上</span>
+              </div>
+            )}
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
           </div>
 
           {/* NOTE */}
-          <div style={{marginBottom:".4rem",flexShrink:0}}>
-            <div style={{fontSize:".45rem",letterSpacing:".15em",color:t.labelColor,fontFamily:"Rajdhani,sans-serif",marginBottom:".2rem",textTransform:"uppercase"}}>Note</div>
-            <div style={{
-              padding:".3rem .6rem",
-              background:t.itemBg,
-              border:`1px solid ${t.tournamentBorder}`,
-              borderRadius:"6px", fontSize:".65rem",
-              color:player.freeText?t.valueColor:t.inactiveTagColor,
-              fontFamily:"'Noto Sans JP',sans-serif",
-              lineHeight:1.6, whiteSpace:"pre-wrap", wordBreak:"break-all",
-              /* backdropFilter削除: Safari/dom-to-image-more で描画崩れの原因になるため */
-              height:"52px", overflow:"hidden",
-            }}>
-              {player.freeText||""}
-            </div>
+          <div>
+            <SectionLabel theme={theme}>NOTE（大会履歴・活動内容・一言など）</SectionLabel>
+            <textarea
+              style={{ ...inputStyle, height: '110px', resize: 'none', lineHeight: 1.7 }}
+              value={form.freeText}
+              onChange={e => set('freeText', e.target.value.slice(0, 120))}
+              placeholder={'例）くりこん杯 3位\n週末メインでプレイ中\n気軽に絡んでください！'}
+            />
+            <div style={{ textAlign: 'right', fontSize: '11px', color: t.label, marginTop: '4px' }}>{form.freeText.length} / 120</div>
           </div>
 
           {/* SNS */}
-          <div style={{marginBottom:".3rem",flexShrink:0}}>
-            <div style={{display:"flex",gap:".18rem"}}>
-              {["X","YouTube","Twitch"].map(s=>{
-                const isActive=(player.sns||[]).includes(s);
-                return <span key={s} style={{...tag(isActive),fontFamily:"Rajdhani,sans-serif",letterSpacing:".05em"}}>{s}</span>;
-              })}
+          <div>
+            <SectionLabel theme={theme}>SNS</SectionLabel>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {SNS_LIST.map(s => (
+                <button key={s} onClick={() => toggleArr('sns', s)} style={tagBtn(form.sns.includes(s))}>{s}</button>
+              ))}
             </div>
           </div>
 
-          {/* 下部スペーサー */}
-          <div style={{flex:1}}/>
-
-          {/* FINAL FANTASY XIV / © SQUARE ENIX */}
-          <div style={{textAlign:"center",fontFamily:"Rajdhani,sans-serif",opacity:.7,marginBottom:".2rem"}}>
-            <div style={{fontSize:".5rem",color:t.footerText,letterSpacing:".12em",marginBottom:".1rem"}}>FINAL FANTASY XIV</div>
-            <div style={{fontSize:".44rem",color:t.footerText,letterSpacing:".05em"}}>© SQUARE ENIX</div>
+          <button onClick={() => onSubmit(form)} style={{
+            width: '100%', padding: '14px', background: t.buttonBg, color: t.buttonText,
+            border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: 700,
+            fontFamily: "'Rajdhani',sans-serif", letterSpacing: '0.08em', cursor: 'pointer', marginTop: '4px',
+          }}>カードを表示 →</button>
+          <div style={{ textAlign: 'center', fontSize: '11px', color: t.label, paddingTop: '4px' }}>
+            FINAL FANTASY XIV © SQUARE ENIX
           </div>
-
-          {/* フッター */}
-          <div style={{
-            display:"flex",
-            justifyContent:"space-between", alignItems:"center",
-            paddingTop:".3rem",
-            borderTop:`1px solid ${t.footerBorder(rc)}`,
-            flexShrink:0,
-          }}>
-            <div style={{fontSize:".52rem",color:t.footerText,fontFamily:"Rajdhani,sans-serif",letterSpacing:".12em"}}>CC PLAYER CARD</div>
-            <button onClick={onEdit} className="cc-btn" style={{
-              background:t.editBtnBg, border:`1px solid ${t.editBtnBorder}`,
-              borderRadius:"8px", color:t.editBtnColor,
-              fontSize:".68rem", padding:".28rem .75rem", cursor:"pointer",
-              fontFamily:"Rajdhani,sans-serif", letterSpacing:".1em", transition:"all .2s",
-            }}>EDIT</button>
-          </div>
-
         </div>
       </div>
-
-      {/* ── PNG保存エリア ── */}
-      {/* カード本体とは別に、PNG化した画像を <img> で表示する。        */}
-      {/* 右クリック（PC）または長押し（スマホ）で保存できる。          */}
-      <div style={{width:`${CARD_W}px`,marginTop:"1.5rem",textAlign:"center"}}>
-
-        {/* 「画像を生成」ボタン */}
-        {!cardImgSrc && (
-          <button
-            onClick={handleRenderCard}
-            disabled={rendering}
-            className="cc-btn"
-            style={{
-              width:"100%",
-              background:t.saveBtnBg(rc), border:`1px solid ${t.saveBtnBorder(rc)}`,
-              borderRadius:"10px", color:t.saveBtnColor(rc),
-              fontSize:".8rem", padding:".5rem", cursor:rendering?"not-allowed":"pointer",
-              fontFamily:"Rajdhani,sans-serif", letterSpacing:".1em", transition:"all .2s",
-              opacity:rendering?.6:1,
-            }}
-          >
-            {rendering ? "生成中…" : "📷 保存用画像を生成"}
-          </button>
-        )}
-
-        {/* 生成済みPNG表示 */}
-        {cardImgSrc && (
-          <div>
-            {/* ガイドテキスト */}
-            <div style={{
-              marginBottom:".6rem",
-              padding:".45rem .75rem",
-              background:theme==="dark"?"rgba(168,216,234,0.06)":"rgba(42,127,160,0.06)",
-              border:theme==="dark"?"1px solid rgba(168,216,234,0.15)":"1px solid rgba(42,127,160,0.2)",
-              borderRadius:"8px",
-              fontSize:".7rem",
-              color:theme==="dark"?"#a8d8eaaa":"#2a7fa0",
-              fontFamily:"'Noto Sans JP',sans-serif",
-              lineHeight:1.7,
-            }}>
-              💾 <b>PC</b>：画像を右クリック →「名前を付けて画像を保存」<br/>
-              📱 <b>スマホ</b>：画像を長押し →「写真に追加」または「保存」
-            </div>
-
-            {/* PNG画像本体 */}
-            <img
-              src={cardImgSrc}
-              alt="CC Player Card"
-              style={{
-                width:"100%",
-                borderRadius:"4px",
-                display:"block",
-              }}
-            />
-
-            {/* 再生成ボタン */}
-            <button
-              onClick={()=>{ setCardImgSrc(null); }}
-              className="cc-btn"
-              style={{
-                marginTop:".75rem", width:"100%",
-                background:"transparent",
-                border:`1px solid ${theme==="dark"?"rgba(255,255,255,0.1)":"rgba(0,0,0,0.1)"}`,
-                borderRadius:"8px",
-                color:theme==="dark"?"#ffffff44":"#aaaaaa",
-                fontSize:".7rem", padding:".35rem",
-                cursor:"pointer", fontFamily:"Rajdhani,sans-serif",
-                letterSpacing:".08em", transition:"all .2s",
-              }}
-            >↺ 再生成</button>
-          </div>
-        )}
-      </div>
-
     </div>
-  );
+  )
 }
 
-// ===================== FORM VIEW =====================
-function PlayerForm({ initial, initialTheme, onSave }) {
-  const [form, setForm] = useState(initial);
-  const [theme, setTheme] = useState(initialTheme||"dark");
-  const fileInputRef = useRef(null);
-  const set = (key,val) => setForm(f=>({...f,[key]:val}));
+function CardView({ player, theme, onEdit }) {
+  const t = THEME[theme]
+  const cardRef = useRef()
+  const [generating, setGenerating] = useState(false)
+  const [showSave, setShowSave] = useState(false)
+  const [cardImgSrc, setCardImgSrc] = useState(null)
 
-  const handleImageUpload = e => {
-    const file = e.target.files[0]; if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => set("screenshotDataUrl", ev.target.result);
-    reader.readAsDataURL(file);
-  };
+  const handleRenderCard = useCallback(async () => {
+    if (!cardRef.current) return
+    setGenerating(true)
+    setCardImgSrc(null)
+    try {
+      await new Promise(r => setTimeout(r, 200))
+      const { default: domtoimage } = await import('dom-to-image-more')
+      const imgEl = cardRef.current.querySelector('img[data-screenshot]')
+      if (imgEl) { try { await imgEl.decode() } catch(e) {} }
+      await new Promise(r => setTimeout(r, 100))
+      const dataUrl = await domtoimage.toPng(cardRef.current, { scale: 2, cacheBust: true })
+      setCardImgSrc(dataUrl)
+      setShowSave(true)
+    } catch (err) {
+      console.error('render error:', err)
+      alert('画像生成に失敗しました。再試行してください。')
+    } finally {
+      setGenerating(false)
+    }
+  }, [player])
 
-  const toggleSubJob = job => setForm(f=>{
-    const cur=f.subJobs||[];
-    return {...f,subJobs:cur.includes(job)?cur.filter(j=>j!==job):[...cur,job]};
-  });
-  const togglePlaystyle = s => setForm(f=>{
-    const cur=f.playstyle||[];
-    return {...f,playstyle:cur.includes(s)?cur.filter(x=>x!==s):[...cur,s]};
-  });
-  const toggleSns = s => setForm(f=>{
-    const cur=f.sns||[];
-    return {...f,sns:cur.includes(s)?cur.filter(x=>x!==s):[...cur,s]};
-  });
+  // マウント時に自動生成開始
+  React.useEffect(() => { handleRenderCard() }, [])
 
-  const isLight = theme==="light";
-  const inp = {
-    width:"100%",
-    background:isLight?"#ffffff":"#1a1a2e",
-    border:isLight?"1px solid rgba(0,0,0,0.12)":"1px solid rgba(255,255,255,0.1)",
-    borderRadius:"8px", color:isLight?"#222233":"#ffffffcc",
-    padding:".6rem .8rem", fontSize:".85rem",
-    fontFamily:"'Noto Sans JP',sans-serif",
-    boxSizing:"border-box", outline:"none",
-  };
-  const lbl = {
-    fontSize:".62rem", letterSpacing:".15em",
-    color:isLight?"#888888":"#ffffff44",
-    display:"block", marginBottom:".3rem",
-    fontFamily:"Rajdhani,sans-serif", textTransform:"uppercase",
-  };
-  const sec = { marginBottom:"1.5rem" };
-  const tagStyle = (active) => ({
-    padding:".25rem .7rem",
-    background:active?(isLight?"rgba(42,127,160,0.15)":"rgba(168,216,234,0.15)"):(isLight?"rgba(0,0,0,0.05)":"rgba(255,255,255,0.04)"),
-    border:`1px solid ${active?(isLight?"rgba(42,127,160,0.5)":"rgba(168,216,234,0.5)"):(isLight?"rgba(0,0,0,0.08)":"rgba(255,255,255,0.07)")}`,
-    borderRadius:"999px", fontSize:".75rem",
-    color:active?(isLight?"#2a7fa0":"#a8d8ea"):(isLight?"#555566":"#ffffff55"),
-    fontFamily:"'Noto Sans JP',sans-serif",
-    cursor:"pointer", transition:"all .15s",
-  });
+  // ファイル名生成 cc-card-FirstLast-dark/white
+  const getFileName = () => {
+    const name = [player.firstName, player.lastName].filter(Boolean).join('') || 'player'
+    const mode = theme === 'dark' ? 'dark' : 'white'
+    return `cc-card-${name}-${mode}.png`
+  }
+
+  const handleDownload = () => {
+    if (!cardImgSrc) return
+    const a = document.createElement('a')
+    a.href = cardImgSrc
+    a.download = getFileName()
+    a.click()
+  }
+
+  if (showSave && cardImgSrc) {
+    return (
+      <div style={{ minHeight: '100vh', background: t.pageBg, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px 40px' }}>
+        <img src={cardImgSrc} alt="Generated card" style={{
+          width: '420px', maxWidth: '100%', display: 'block',
+          borderRadius: '4px', border: `1px solid ${t.border}`, animation: 'fadeIn 0.4s ease',
+        }} />
+        <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button onClick={() => { setShowSave(false); setCardImgSrc(null) }} style={{
+            padding: '7px 14px', background: t.inactiveTagBg, border: `1px solid ${t.inactiveTagBorder}`,
+            borderRadius: '20px', color: t.value, fontSize: '12px', fontWeight: 500,
+            cursor: 'pointer', fontFamily: "'Noto Sans JP',sans-serif",
+          }}>← 戻る</button>
+          <button onClick={handleDownload} style={{
+            padding: '7px 16px', background: t.buttonBg, border: 'none', borderRadius: '20px',
+            color: t.buttonText, fontSize: '12px', fontWeight: 700,
+            cursor: 'pointer', fontFamily: "'Noto Sans JP',sans-serif",
+          }}>💾 ダウンロード</button>
+          <button onClick={handleRenderCard} disabled={generating} style={{
+            padding: '7px 14px', background: t.inactiveTagBg, border: `1px solid ${t.inactiveTagBorder}`,
+            borderRadius: '20px', color: t.value, fontSize: '12px',
+            cursor: generating ? 'wait' : 'pointer', fontFamily: "'Noto Sans JP',sans-serif",
+            opacity: generating ? 0.7 : 1,
+          }}>{generating ? '生成中...' : '↺ 再生成'}</button>
+        </div>
+        <div style={{
+          width: '420px', maxWidth: '100%', marginTop: '12px',
+          background: t.accentColor + '12', border: `1px solid ${t.accentColor}35`,
+          borderRadius: '8px', padding: '8px 14px',
+          color: t.label, fontFamily: "'Noto Sans JP',sans-serif", fontSize: '11px', lineHeight: 1.8,
+        }}>
+          💾 ダウンロードボタン または
+          📱 スマホ：長押し →「写真に追加」／
+          💻 PC：右クリック →「名前を付けて保存」
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div style={{
-      minHeight:"100vh",
-      background:isLight?"#e8e8e2":"linear-gradient(135deg,#0a0a0f,#0f0f1a 40%,#0a0a14)",
-      display:"flex", justifyContent:"center", padding:"2rem 1rem",
-    }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Noto+Sans+JP:wght@300;400;500&display=swap');
-        input::placeholder{color:${isLight?"#aaaaaa":"#ffffff33"}}
-        select option{color:#000;background:#fff}
-        input:focus,select:focus{border-color:${isLight?"rgba(0,0,0,0.3)":"rgba(168,216,234,0.4)"}!important}
-        select{appearance:none}
-        .upload-hover:hover{opacity:.85}
-        .tag-toggle{cursor:pointer;transition:all .15s;user-select:none}
-        .tag-toggle:hover{opacity:.75}
-      `}</style>
-      <div style={{width:"100%",maxWidth:"480px"}}>
-
-        <div style={{fontSize:".6rem",letterSpacing:".25em",color:isLight?"#aaaaaa":"#ffffff33",marginBottom:".4rem",fontFamily:"Rajdhani,sans-serif"}}>CC PLAYER CARD</div>
-
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"2rem"}}>
-          <h1 style={{color:isLight?"#1a1a2e":"#ffffff",fontSize:"1.5rem",fontFamily:"Rajdhani,sans-serif",fontWeight:700,letterSpacing:".05em",margin:0}}>プロフィール編集</h1>
-          <div style={{display:"flex",gap:".4rem",background:isLight?"rgba(0,0,0,0.06)":"rgba(255,255,255,0.06)",borderRadius:"10px",padding:".25rem"}}>
-            {Object.values(THEMES).map(th=>(
-              <button key={th.id} onClick={()=>setTheme(th.id)} style={{
-                padding:".3rem .75rem",
-                background:theme===th.id?(isLight?"#ffffff":"rgba(255,255,255,0.12)"):"transparent",
-                border:"none", borderRadius:"7px", fontSize:".72rem",
-                color:theme===th.id?(isLight?"#1a1a2e":"#ffffff"):(isLight?"#888888":"#ffffff55"),
-                cursor:"pointer", fontFamily:"Rajdhani,sans-serif", letterSpacing:".05em", transition:"all .2s",
-                boxShadow:theme===th.id?"0 1px 4px rgba(0,0,0,0.1)":"none",
-              }}>{th.label}</button>
-            ))}
-          </div>
-        </div>
-
-        {/* キャラ名 */}
-        <div style={sec}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:".8rem",marginBottom:".8rem"}}>
-            <div><label style={lbl}>ファーストネーム</label><input style={inp} value={form.firstName} onChange={e=>set("firstName",e.target.value)}/></div>
-            <div><label style={lbl}>ラストネーム</label><input style={inp} value={form.lastName} onChange={e=>set("lastName",e.target.value)}/></div>
-          </div>
-          <label style={lbl}>呼び名</label>
-          <input style={inp} value={form.nickname} onChange={e=>set("nickname",e.target.value)}/>
-        </div>
-
-        {/* サーバー・ランク */}
-        <div style={sec}>
-          <div style={{marginBottom:".8rem"}}>
-            <label style={lbl}>サーバー</label>
-            <select style={inp} value={form.server} onChange={e=>set("server",e.target.value)}>
-              <option value="">選択してください</option>
-              {DC_LIST.map((d,i)=><option key={i} value={d.value} disabled={d.disabled}>{d.label}</option>)}
-            </select>
-          </div>
-          <label style={lbl}>最高ランク</label>
-          <select style={inp} value={form.highestRank} onChange={e=>set("highestRank",e.target.value)}>
-            <option value="">選択</option>
-            {RANK_LIST.map(r=><option key={r} value={r}>{r}</option>)}
-          </select>
-        </div>
-
-        {/* メインジョブ */}
-        <div style={sec}>
-          <label style={lbl}>メインジョブ</label>
-          <select style={inp} value={form.mainJob} onChange={e=>set("mainJob",e.target.value)}>
-            <option value="">選択</option>
-            {JOB_LIST.map(j=><option key={j} value={j}>{j}</option>)}
-          </select>
-        </div>
-
-        {/* サブジョブ */}
-        <div style={sec}>
-          <label style={{...lbl,marginBottom:".3rem"}}>使用ジョブ（複数選択可）</label>
-          <div style={{display:"flex",flexWrap:"wrap",gap:".4rem"}}>
-            {JOB_LIST.filter(j=>j!==form.mainJob).map(j=>{
-              const active=(form.subJobs||[]).includes(j);
-              return <span key={j} className="tag-toggle" onClick={()=>toggleSubJob(j)} style={tagStyle(active)}>{j}</span>;
-            })}
-          </div>
-        </div>
-
-        {/* プレイスタイル */}
-        <div style={sec}>
-          <label style={lbl}>プレイスタイル（複数選択可）</label>
-          <div style={{display:"flex",flexWrap:"wrap",gap:".4rem"}}>
-            {PLAYSTYLE_LIST.map(s=>{
-              const active=(form.playstyle||[]).includes(s);
-              return <span key={s} className="tag-toggle" onClick={()=>togglePlaystyle(s)} style={tagStyle(active)}>{s}</span>;
-            })}
-          </div>
-        </div>
-
-        {/* チーム */}
-        <div style={sec}>
-          <label style={lbl}>チーム</label>
-          <input style={inp} value={form.team} onChange={e=>set("team",e.target.value)} placeholder="チーム名（任意）"/>
-        </div>
-
-        {/* スクショ */}
-        <div style={sec}>
-          <label style={lbl}>スクリーンショット画像</label>
-          <div style={{marginBottom:".6rem",padding:".45rem .75rem",background:isLight?"rgba(42,127,160,0.06)":"rgba(168,216,234,0.06)",border:isLight?"1px solid rgba(42,127,160,0.2)":"1px solid rgba(168,216,234,0.15)",borderRadius:"8px",fontSize:".7rem",color:isLight?"#2a7fa0":"#a8d8eaaa",fontFamily:"'Noto Sans JP',sans-serif",lineHeight:1.6}}>
-            📐 推奨サイズ：横幅 <b>1280px 以上</b>・縦横比 <b>4:3 〜 16:9</b> 推奨
-          </div>
-          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{display:"none"}}/>
-          {form.screenshotDataUrl ? (
-            <div>
-              <img src={form.screenshotDataUrl} alt="preview" style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:"10px",border:isLight?"1px solid rgba(0,0,0,0.1)":"1px solid rgba(255,255,255,0.1)",display:"block",marginBottom:".6rem"}}/>
-              <div style={{display:"flex",gap:".5rem"}}>
-                <button onClick={()=>fileInputRef.current.click()} style={{flex:1,background:isLight?"rgba(42,127,160,0.08)":"rgba(168,216,234,0.08)",border:isLight?"1px solid rgba(42,127,160,0.3)":"1px solid rgba(168,216,234,0.3)",borderRadius:"8px",color:isLight?"#2a7fa0":"#a8d8ea",fontSize:".75rem",padding:".4rem",cursor:"pointer",fontFamily:"Rajdhani,sans-serif"}}>画像を変更</button>
-                <button onClick={()=>set("screenshotDataUrl","")} style={{flex:1,background:"rgba(255,100,100,0.06)",border:"1px solid rgba(255,100,100,0.2)",borderRadius:"8px",color:"rgba(200,80,80,0.9)",fontSize:".75rem",padding:".4rem",cursor:"pointer",fontFamily:"Rajdhani,sans-serif"}}>削除</button>
-              </div>
-            </div>
-          ) : (
-            <div className="upload-hover" onClick={()=>fileInputRef.current.click()} style={{border:isLight?"2px dashed rgba(0,0,0,0.12)":"2px dashed rgba(255,255,255,0.12)",borderRadius:"12px",aspectRatio:"4/3",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",gap:".4rem"}}>
-              <div style={{fontSize:"2rem"}}>🖼️</div>
-              <div style={{fontSize:".8rem",color:isLight?"#888888":"#ffffff44",fontFamily:"'Noto Sans JP',sans-serif"}}>クリックしてスクショを選択</div>
-              <div style={{fontSize:".65rem",color:isLight?"#aaaaaa":"#ffffff22",fontFamily:"Rajdhani,sans-serif"}}>JPG / PNG　推奨：1280px幅以上</div>
-            </div>
-          )}
-        </div>
-
-        {/* NOTE */}
-        <div style={sec}>
-          <label style={lbl}>NOTE（大会履歴・活動内容・一言など）</label>
-          <textarea value={form.freeText||""} onChange={e=>set("freeText",e.target.value)}
-            placeholder={"例）くりこん杯 3位\n週末メインでプレイ中\n気軽に絡んでください！"}
-            maxLength={120} style={{...inp,height:"90px",resize:"none",lineHeight:1.7}}/>
-          <div style={{textAlign:"right",fontSize:".6rem",color:isLight?"#aaaaaa":"#ffffff33",fontFamily:"Rajdhani,sans-serif",marginTop:".2rem"}}>{(form.freeText||"").length} / 120</div>
-        </div>
-
-        {/* SNS */}
-        <div style={sec}>
-          <label style={lbl}>SNS（複数選択可）</label>
-          <div style={{display:"flex",gap:".4rem"}}>
-            {["X","YouTube","Twitch"].map(s=>{
-              const active=(form.sns||[]).includes(s);
-              return <span key={s} className="tag-toggle" onClick={()=>toggleSns(s)} style={{...tagStyle(active),fontFamily:"Rajdhani,sans-serif",letterSpacing:".05em",fontSize:".8rem",padding:".3rem .9rem"}}>{s}</span>;
-            })}
-          </div>
-        </div>
-
-        {/* 保存ボタン */}
-        <button onClick={()=>onSave(form,theme)} style={{
-          width:"100%",
-          background:isLight?"linear-gradient(90deg,rgba(42,127,160,0.12),rgba(68,85,204,0.12))":"linear-gradient(90deg,rgba(168,216,234,0.12),rgba(184,200,255,0.12))",
-          border:isLight?"1px solid rgba(42,127,160,0.4)":"1px solid rgba(168,216,234,0.4)",
-          borderRadius:"12px", color:isLight?"#2a7fa0":"#a8d8ea",
-          fontSize:".9rem", fontWeight:600, padding:".9rem",
-          cursor:"pointer", fontFamily:"Rajdhani,sans-serif",
-          letterSpacing:".15em", textTransform:"uppercase", transition:"all .2s",
-          marginBottom:"3rem",
-        }}>カードを表示 →</button>
-
-        {/* フォーム最下部：FINAL FANTASY XIV / © SQUARE ENIX */}
-        <div style={{
-          textAlign:"center", marginBottom:"2rem", opacity:.5,
-          fontFamily:"Rajdhani,sans-serif",
-        }}>
-          <div style={{fontSize:".55rem",color:isLight?"#888888":"#ffffff44",letterSpacing:".12em",marginBottom:".15rem"}}>FINAL FANTASY XIV</div>
-          <div style={{fontSize:".5rem",color:isLight?"#888888":"#ffffff33",letterSpacing:".05em"}}>© SQUARE ENIX</div>
-        </div>
-
+    <div style={{ minHeight: '100vh', background: t.pageBg, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px 40px' }}>
+      <PlayerCard player={player} theme={theme} cardRef={cardRef} />
+      <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+        <button onClick={onEdit} style={{
+          padding: '10px 20px', background: t.inactiveTagBg, border: `1px solid ${t.inactiveTagBorder}`,
+          borderRadius: '8px', color: t.value, fontSize: '14px', fontWeight: 600,
+          cursor: 'pointer', fontFamily: "'Rajdhani',sans-serif",
+        }}>← 編集に戻る</button>
+        <button onClick={handleRenderCard} disabled={generating} style={{
+          padding: '10px 20px', background: t.buttonBg, border: 'none', borderRadius: '8px',
+          color: t.buttonText, fontSize: '14px', fontWeight: 700,
+          cursor: generating ? 'wait' : 'pointer', fontFamily: "'Rajdhani',sans-serif",
+          opacity: generating ? 0.7 : 1,
+        }}>{generating ? '⏳ 生成中...' : '↺ 再生成'}</button>
       </div>
+      {generating && (
+        <div style={{
+          marginTop: '14px', padding: '10px 18px',
+          background: t.accentColor + '15', border: `1px solid ${t.accentColor}40`,
+          borderRadius: '8px', textAlign: 'center',
+          color: t.label, fontFamily: "'Noto Sans JP',sans-serif", fontSize: '12px', lineHeight: 1.8,
+        }}>
+          ⏳ フォントを読み込んでいます…<br />
+          <span style={{ fontSize: '11px', opacity: 0.7 }}>初回は10秒ほどかかる場合があります。そのままお待ちください。</span>
+        </div>
+      )}
     </div>
-  );
+  )
 }
 
-// ===================== APP =====================
 export default function App() {
-  const [view, setView]     = useState("form");
-  const [player, setPlayer] = useState(emptyPlayer);
-  const [theme, setTheme]   = useState("dark");
-
-  const handleSave = (data, selectedTheme) => {
-    setPlayer(data); setTheme(selectedTheme); setView("card");
-  };
-
-  if (view==="card") return <PlayerCard player={player} theme={theme} onEdit={()=>setView("form")}/>;
-  return <PlayerForm initial={player} initialTheme={theme} onSave={handleSave}/>;
+  const [view, setView]     = useState('form')
+  const [player, setPlayer] = useState(emptyPlayer)
+  const [theme, setTheme]   = useState('dark')
+  return (
+    <>
+      <GlobalStyle />
+      {view === 'form' ? (
+        <PlayerForm
+          onSubmit={(data) => { setPlayer(data); setView('card') }}
+          theme={theme}
+          onToggleTheme={(t) => setTheme(t)}
+          initialData={player}
+        />
+      ) : (
+        <CardView player={player} theme={theme} onEdit={() => setView('form')} />
+      )}
+    </>
+  )
 }
