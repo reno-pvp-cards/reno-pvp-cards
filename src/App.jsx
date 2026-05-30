@@ -543,11 +543,11 @@ function CardView({ player, theme, onEdit }) {
     try {
       await document.fonts.ready
 
-      const S = 2          // retina scale
-      const W = 420, H = 800
-      const cw = W * S, ch = H * S
+      const S = 2
+      const W = 420, H = 800   // 固定サイズ（絶対）
+      const SS_H = 300         // スクショエリア
       const cv = document.createElement('canvas')
-      cv.width = cw; cv.height = ch
+      cv.width = W * S; cv.height = H * S
       const ctx = cv.getContext('2d')
       ctx.scale(S, S)
 
@@ -555,10 +555,7 @@ function CardView({ player, theme, onEdit }) {
       const ac = t.accentColor
 
       // ── ヘルパー ──────────────────────────────────────
-      // rgba文字列をそのまま使えるようにパース不要、ctx.fillStyle に直接代入
-      const fillRect = (x, y, w, h, color) => {
-        ctx.fillStyle = color; ctx.fillRect(x, y, w, h)
-      }
+      const fillRect = (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(x, y, w, h) }
       const roundRect = (x, y, w, h, r, fill, stroke) => {
         ctx.beginPath()
         ctx.moveTo(x + r, y)
@@ -567,71 +564,84 @@ function CardView({ player, theme, onEdit }) {
         ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r)
         ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r)
         ctx.closePath()
-        if (fill)  { ctx.fillStyle = fill;   ctx.fill() }
+        if (fill)  { ctx.fillStyle = fill; ctx.fill() }
         if (stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke() }
       }
-      const text = (str, x, y, font, color, align = 'left') => {
-        ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align
-        ctx.fillText(str, x, y)
+      const txt = (str, x, y, font, color, align = 'left', baseline = 'alphabetic') => {
+        ctx.font = font; ctx.fillStyle = color
+        ctx.textAlign = align; ctx.textBaseline = baseline
+        ctx.fillText(String(str), x, y)
       }
       const loadImg = (src) => new Promise((res, rej) => {
         const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src
       })
 
+      // タグ描画（DOM tagBase準拠: padding 1px 8px, fontSize 9px, border 1px,
+      //   margin 2px(=外側に左右2px,上下2px), minWidth 34px, borderRadius 20px）
+      // 実効タグ高さ=17px、行ピッチ=17+4=21px、タグ間=4px
+      const TAG_H = 17, TAG_PITCH = 21, TAG_GAP = 4, TAG_PAD = 8, TAG_MINW = 34
+      const drawTags = (tags, startY) => {
+        let tx = 16, ty = startY
+        tags.forEach(({ label, type, small }) => {
+          const fw = type === 'main' ? 700 : 500
+          const fs = small ? 9 : 9
+          const hpad = small ? 6 : TAG_PAD
+          ctx.font = `${fw} ${fs}px "Noto Sans JP"`
+          const tw = Math.max(ctx.measureText(label).width + hpad * 2, TAG_MINW)
+          if (tx + tw > W - 16) { tx = 16; ty += TAG_PITCH }
+          let bg, border, fg
+          if (type === 'main')     { bg = t.inactiveTagBg; border = ac + '88'; fg = ac }
+          else if (type === 'sub') { bg = ac + '22';       border = ac + '88'; fg = ac }
+          else                     { bg = t.inactiveTagBg; border = t.inactiveTagBorder; fg = t.inactiveTagText }
+          roundRect(tx, ty, tw, TAG_H, TAG_H / 2, bg, border)
+          ctx.font = `${fw} ${fs}px "Noto Sans JP"`
+          ctx.fillStyle = fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+          ctx.fillText(label, tx + tw / 2, ty + TAG_H / 2 + 0.5)
+          tx += tw + TAG_GAP
+        })
+        return ty + TAG_H  // 最終行 bottom
+      }
+
       // ── 背景 ──────────────────────────────────────────
       fillRect(0, 0, W, H, t.cardBg)
 
-      // ── スクショエリア (0〜300px) ─────────────────────
+      // ── スクショエリア ────────────────────────────────
       if (player.screenshotDataUrl) {
         const img = await loadImg(player.screenshotDataUrl)
-        // cover + center-top クロップ
-        const srcR = img.width / img.height, tgtR = W / 300
+        const srcR = img.width / img.height, tgtR = W / SS_H
         let sx, sy, sw, sh
         if (srcR > tgtR) { sh = img.height; sw = sh * tgtR; sy = 0; sx = (img.width - sw) / 2 }
         else             { sw = img.width;  sh = sw / tgtR;  sx = 0; sy = 0 }
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, 300)
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, SS_H)
       } else {
-        // NO IMAGE グラデ
-        const grad = ctx.createLinearGradient(0, 0, W, 300)
-        if (theme === 'dark') {
-          grad.addColorStop(0, '#0d0d30'); grad.addColorStop(0.5, '#1a0a2e'); grad.addColorStop(1, '#0a1520')
-        } else {
-          grad.addColorStop(0, '#f0e8f0'); grad.addColorStop(0.5, '#e8d8e8'); grad.addColorStop(1, '#d8e8f0')
-        }
-        fillRect(0, 0, W, 300, grad)
-        text('NO IMAGE', W/2, 158, '13px "Noto Sans JP"', t.label, 'center')
+        const grad = ctx.createLinearGradient(0, 0, W, SS_H)
+        if (theme === 'dark') { grad.addColorStop(0,'#0d0d30'); grad.addColorStop(0.5,'#1a0a2e'); grad.addColorStop(1,'#0a1520') }
+        else                  { grad.addColorStop(0,'#f0e8f0'); grad.addColorStop(0.5,'#e8d8e8'); grad.addColorStop(1,'#d8e8f0') }
+        fillRect(0, 0, W, SS_H, grad)
+        txt('NO IMAGE', W / 2, SS_H / 2, '13px "Noto Sans JP"', t.label, 'center', 'middle')
       }
 
-      // スクショ下グラデオーバーレイ
-      const fadeGrad = ctx.createLinearGradient(0, 140, 0, 300)
-      fadeGrad.addColorStop(0, 'transparent')
-      fadeGrad.addColorStop(0.7, t.cardBg + 'cc')
-      fadeGrad.addColorStop(1,   t.cardBg)
-      fillRect(0, 140, W, 160, fadeGrad)
+      // フェードオーバーレイ（DOM: height160, to-top, cardBg→cardBgcc(30%)→transparent）
+      const fadeGrad = ctx.createLinearGradient(0, SS_H, 0, SS_H - 160)
+      fadeGrad.addColorStop(0, t.cardBg)
+      fadeGrad.addColorStop(0.3, t.cardBg + 'cc')
+      fadeGrad.addColorStop(1, 'transparent')
+      fillRect(0, SS_H - 160, W, 160, fadeGrad)
 
-      // プレイヤー名エリア（スクショ下部）
-      // プレビュー準拠: bottom:12px からの絶対位置 → y=300-12=288 基準
+      // プレイヤー名（DOM: bottom12px, left18px）
       ctx.textBaseline = 'alphabetic'
-      // "Crystal Conflict Player" ラベル: 10px, 名前28pxの上に1px margin
-      // 名前下端: 300-12=288, 名前top=288-28=260, ラベル下端=260-1-3=256(概算)
-      ctx.letterSpacing = '0.2em'
-      text('CRYSTAL CONFLICT PLAYER', 18, 257, '500 10px "Barlow Condensed"', ac)
-      ctx.letterSpacing = '0px'
+      const nameBottom = SS_H - 12
+      txt('CRYSTAL CONFLICT PLAYER', 18, nameBottom - 30, '500 10px "Barlow Condensed"', ac)
       const fullName = ((player.firstName || 'First') + ' ' + (player.lastName || 'Last')).trim()
-      text(fullName, 18, 286, '700 28px "Barlow Condensed"', t.playerNameColor)
-      if (player.nickname) {
-        ctx.textBaseline = 'alphabetic'
-        text(player.nickname, 18, 299, '13px "Noto Sans JP"', t.value)
-      }
+      txt(fullName, 18, nameBottom, '700 28px "Barlow Condensed"', t.playerNameColor)
+      if (player.nickname) txt(player.nickname, 18, nameBottom + 14, '13px "Noto Sans JP"', t.value)
 
-      // ランクバッジ (top:14, right:14, w:56+padding, h:54+padding)
+      // ランクバッジ（DOM: top14, right14, padding 6px10px, minWidth56）
       const rank = player.highestRank
       if (rank) {
         roundRect(W - 84, 14, 70, 56, 10, t.rankBadgeBg, ac + '66')
-        ctx.textBaseline = 'middle'
-        text(RANK_CONFIG[rank]?.icon || '', W - 49, 38, '22px serif', '#fff', 'center')
-        ctx.textBaseline = 'alphabetic'
-        text(rank, W - 49, 62, '700 11px "Noto Sans JP"', ac, 'center')
+        txt(RANK_CONFIG[rank]?.icon || '', W - 49, 24, '22px serif', '#fff', 'center', 'top')
+        txt(rank, W - 49, 62, '700 11px "Noto Sans JP"', ac, 'center', 'alphabetic')
       }
 
       // トップアクセントライン
@@ -639,77 +649,51 @@ function CardView({ player, theme, onEdit }) {
       lineGrad.addColorStop(0, 'transparent'); lineGrad.addColorStop(0.5, ac); lineGrad.addColorStop(1, 'transparent')
       fillRect(0, 0, W, 2, lineGrad)
 
-      // ── 情報エリア (300〜800px) ───────────────────────
-      // プレビューDOM準拠: padding 8px 16px, gap 6px
-      let cy = 308
+      // ── 情報エリア (300〜800px / padding 8px 16px 10px, gap 6px) ──
+      const GAP = 6
+      let cy = SS_H + 8   // padding-top 8px
 
-      // タグ描画ヘルパー（プレビューに合わせた寸法）
-      // tagH=20px, pad水平8px, 行間4px, 最小幅34px
-      const drawTags = (tags, startY) => {
-        const pad = 8, tagH = 20, gap = 4, fontSize = 9
-        let tx = 16, ty = startY
-        tags.forEach(({ label, type }) => {
-          const fw = type === 'main' ? 700 : 500
-          ctx.font = `${fw} ${fontSize}px "Noto Sans JP"`
-          const tw = ctx.measureText(label).width + pad * 2
-          const tagW = Math.max(tw, 34)
-          if (tx + tagW > W - 16) { tx = 16; ty += tagH + gap }
-          let bg, border, fg
-          if (type === 'main')     { bg = t.inactiveTagBg; border = ac + '88'; fg = ac }
-          else if (type === 'sub') { bg = ac + '22';       border = ac + '88'; fg = ac }
-          else                     { bg = t.inactiveTagBg; border = t.inactiveTagBorder; fg = t.inactiveTagText }
-          roundRect(tx, ty, tagW, tagH, 10, bg, border)
-          // テキストベースライン: タグ中央に合わせる
-          ctx.font = `${fw} ${fontSize}px "Noto Sans JP"`
-          ctx.fillStyle = fg; ctx.textAlign = 'center'
-          ctx.textBaseline = 'middle'
-          ctx.fillText(label, tx + tagW / 2, ty + tagH / 2)
-          ctx.textBaseline = 'alphabetic'
-          tx += tagW + gap
-        })
-        return ty + tagH  // 最後の行のtop + tagH
-      }
-
-      // SERVER / TEAM ボックス (height: 4+10+14=46 → padding 4px 10px)
+      // SERVER / TEAM（DOM padding 4px 10px → 高さ約46px）
       const stH = 46
       roundRect(16, cy, W - 32, stH, 8, t.sectionBg, t.border)
       ctx.textBaseline = 'alphabetic'
-      text('SERVER', 26, cy + 14, '700 9px "Barlow Condensed"', t.label)
-      text(player.server || '—', 26, cy + 32, '600 13px "Noto Sans JP"', t.value)
+      txt('SERVER', 26, cy + 14, '700 9px "Barlow Condensed"', t.label)
+      txt(player.server || '—', 26, cy + 31, '600 13px "Noto Sans JP"', t.value)
       ctx.strokeStyle = t.border; ctx.lineWidth = 1
       ctx.beginPath(); ctx.moveTo(W / 2, cy + 8); ctx.lineTo(W / 2, cy + stH - 8); ctx.stroke()
-      text('TEAM', W / 2 + 12, cy + 14, '700 9px "Barlow Condensed"', t.label)
-      text(player.team || '—', W / 2 + 12, cy + 32, '600 13px "Noto Sans JP"', t.value)
-      cy += stH + 6  // gap 6px
+      txt('TEAM', W / 2 + 12, cy + 14, '700 9px "Barlow Condensed"', t.label)
+      txt(player.team || '—', W / 2 + 12, cy + 31, '600 13px "Noto Sans JP"', t.value)
+      cy += stH + GAP
 
-      // JOBS セクション
-      ctx.textBaseline = 'alphabetic'
-      text('JOBS', 16, cy + 11, '600 11px "Barlow Condensed"', t.label)
-      cy += 16
+      // セクションラベル（DOM: fontSize11, marginBottom2 → ラベル高さ約13px）
+      const drawSectionLabel = (label) => {
+        ctx.textBaseline = 'alphabetic'
+        txt(label, 16, cy + 10, '600 11px "Barlow Condensed"', t.label)
+        cy += 13 + 2  // ラベル高さ+marginBottom
+      }
+
+      // JOBS
+      drawSectionLabel('JOBS')
       const jobTags = ALL_JOBS.map(j => ({
         label: j === player.mainJob ? '★ ' + j : j,
         type: j === player.mainJob ? 'main' : player.subJobs.includes(j) ? 'sub' : 'inactive'
       }))
-      cy = drawTags(jobTags, cy) + 6  // gap 6px
+      cy = drawTags(jobTags, cy) + GAP
 
-      // PLAY STYLE セクション
-      ctx.textBaseline = 'alphabetic'
-      text('PLAY STYLE', 16, cy + 11, '600 11px "Barlow Condensed"', t.label)
-      cy += 16
+      // PLAY STYLE
+      drawSectionLabel('PLAY STYLE')
       const psTags = PLAYSTYLE_LIST.map(ps => ({
         label: ps, type: player.playstyle.includes(ps) ? 'sub' : 'inactive'
       }))
-      cy = drawTags(psTags, cy) + 6
+      cy = drawTags(psTags, cy) + GAP
 
-      // NOTE セクション (height: 52px, padding 6px 10px)
-      ctx.textBaseline = 'alphabetic'
-      text('NOTE', 16, cy + 11, '600 11px "Barlow Condensed"', t.label)
-      cy += 16
+      // NOTE
+      drawSectionLabel('NOTE')
       const noteH = 52
       roundRect(16, cy, W - 32, noteH, 8, t.noteBg, t.noteBorder)
       if (player.freeText) {
-        ctx.font = '11px "Noto Sans JP"'; ctx.fillStyle = t.value
-        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
+        ctx.font = '11px "Noto Sans JP"'
+        ctx.fillStyle = t.value; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
         const lines = []
         let line = ''
         for (const ch of player.freeText) {
@@ -718,21 +702,23 @@ function CardView({ player, theme, onEdit }) {
           else line += ch
         }
         lines.push(line)
-        lines.slice(0, 3).forEach((l, i) => ctx.fillText(l, 26, cy + 17 + i * 17))
+        lines.slice(0, 3).forEach((l, i) => ctx.fillText(l, 26, cy + 16 + i * 17))
       }
-      cy += noteH + 6
+      cy += noteH + GAP
 
-      // SNS タグ
-      const snsTags = SNS_LIST.map(s => ({ label: s, type: player.sns.includes(s) ? 'sub' : 'inactive' }))
-      cy = drawTags(snsTags, cy) + 6
+      // SNS（DOM: padding 1px 6px, gap 4px）
+      const snsTags = SNS_LIST.map(s => ({
+        label: s, type: player.sns.includes(s) ? 'sub' : 'inactive', small: true
+      }))
+      cy = drawTags(snsTags, cy) + GAP
 
-      // フッター区切り線
-      ctx.textBaseline = 'alphabetic'
-      ctx.strokeStyle = t.border; ctx.lineWidth = 1
+      // フッター（DOM: marginTop4, borderTop, paddingTop6）
+      cy += 4
+      ctx.strokeStyle = t.border; ctx.lineWidth = 1; ctx.textBaseline = 'alphabetic'
       ctx.beginPath(); ctx.moveTo(16, cy); ctx.lineTo(W - 16, cy); ctx.stroke()
-      cy += 8
-      text('CC PLAYER CARD', 16, cy + 11, '700 11px "Barlow Condensed"', ac)
-      text('FINAL FANTASY XIV © SQUARE ENIX', 16, cy + 23, '9px "Barlow Condensed"', t.label)
+      cy += 6
+      txt('CC PLAYER CARD', 16, cy + 11, '700 11px "Barlow Condensed"', ac)
+      txt('FINAL FANTASY XIV © SQUARE ENIX', 16, cy + 23, '9px "Barlow Condensed"', t.label)
 
       const dataUrl = cv.toDataURL('image/png')
       setCardImgSrc(dataUrl)
