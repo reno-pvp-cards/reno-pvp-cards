@@ -541,29 +541,11 @@ function CardView({ player, theme, onEdit }) {
     setGenerating(true)
     setCardImgSrc(null)
     try {
-      await document.fonts.ready
-      // DOM内のスクショ画像が完全に表示されるまで待つ
-      if (player.screenshotDataUrl) {
-        const imgEl = cardRef.current.querySelector('img[data-screenshot]')
-        if (imgEl) {
-          // 画像のsrcがセットされて描画完了するまでポーリング
-          await new Promise(resolve => {
-            const check = () => {
-              if (imgEl.complete && imgEl.naturalWidth > 0) {
-                resolve()
-              } else {
-                requestAnimationFrame(check)
-              }
-            }
-            check()
-            setTimeout(resolve, 5000) // 最大5秒
-          })
-          try { await imgEl.decode() } catch(e) {}
-        }
-      }
-      // レンダリング安定待ち
-      await new Promise(r => setTimeout(r, 400))
+      await new Promise(r => setTimeout(r, 200))
       const { default: domtoimage } = await import('dom-to-image-more')
+      const imgEl = cardRef.current.querySelector('img[data-screenshot]')
+      if (imgEl) { try { await imgEl.decode() } catch(e) {} }
+      await new Promise(r => setTimeout(r, 100))
       const dataUrl = await domtoimage.toPng(cardRef.current, { scale: 2, cacheBust: true })
       setCardImgSrc(dataUrl)
       setShowSave(true)
@@ -575,11 +557,7 @@ function CardView({ player, theme, onEdit }) {
     }
   }, [player])
 
-  // マウント時に自動生成開始
-  React.useEffect(() => {
-    const timer = setTimeout(() => { handleRenderCard() }, 300)
-    return () => clearTimeout(timer)
-  }, [])
+  // 自動生成なし：ユーザーがボタンを押したときのみ生成
 
   // ファイル名生成 cc-card-FirstLast-dark/white
   const getFileName = () => {
@@ -637,30 +615,34 @@ function CardView({ player, theme, onEdit }) {
 
   return (
     <div style={{ minHeight: '100vh', background: t.pageBg, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px 40px' }}>
-      <PlayerCard player={player} theme={theme} cardRef={cardRef} />
-      <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-        <button onClick={onEdit} style={{
-          padding: '10px 20px', background: t.inactiveTagBg, border: `1px solid ${t.inactiveTagBorder}`,
-          borderRadius: '8px', color: t.value, fontSize: '14px', fontWeight: 600,
-          cursor: 'pointer', fontFamily: "'Rajdhani',sans-serif",
-        }}>← 編集に戻る</button>
-        <button onClick={handleRenderCard} disabled={generating} style={{
-          padding: '10px 20px', background: t.buttonBg, border: 'none', borderRadius: '8px',
-          color: t.buttonText, fontSize: '14px', fontWeight: 700,
-          cursor: generating ? 'wait' : 'pointer', fontFamily: "'Rajdhani',sans-serif",
-          opacity: generating ? 0.7 : 1,
-        }}>{generating ? '⏳ 生成中...' : '↺ 再生成'}</button>
-      </div>
-      {generating && (
-        <div style={{
-          marginTop: '14px', padding: '10px 18px',
-          background: t.accentColor + '15', border: `1px solid ${t.accentColor}40`,
-          borderRadius: '8px', textAlign: 'center',
-          color: t.label, fontFamily: "'Noto Sans JP',sans-serif", fontSize: '12px', lineHeight: 1.8,
-        }}>
-          ⏳ フォントを読み込んでいます…<br />
-          <span style={{ fontSize: '11px', opacity: 0.7 }}>初回は10秒ほどかかる場合があります。そのままお待ちください。</span>
-        </div>
+      {/* プレビュー：生成完了前のみ表示 */}
+      {!showSave && (
+        <>
+          <PlayerCard player={player} theme={theme} cardRef={cardRef} />
+          <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+            <button onClick={onEdit} style={{
+              padding: '10px 20px', background: t.inactiveTagBg, border: `1px solid ${t.inactiveTagBorder}`,
+              borderRadius: '8px', color: t.value, fontSize: '14px', fontWeight: 600,
+              cursor: 'pointer', fontFamily: "'Rajdhani',sans-serif",
+            }}>← 編集に戻る</button>
+            <button onClick={handleRenderCard} disabled={generating} style={{
+              padding: '10px 20px', background: t.buttonBg, border: 'none', borderRadius: '8px',
+              color: t.buttonText, fontSize: '14px', fontWeight: 700,
+              cursor: generating ? 'wait' : 'pointer', fontFamily: "'Rajdhani',sans-serif",
+              opacity: generating ? 0.7 : 1,
+            }}>{generating ? '⏳ 生成中...' : '🖼️ カードを生成'}</button>
+          </div>
+          {generating && (
+            <div style={{
+              marginTop: '14px', padding: '10px 18px',
+              background: t.accentColor + '15', border: `1px solid ${t.accentColor}40`,
+              borderRadius: '8px', textAlign: 'center',
+              color: t.label, fontFamily: "'Noto Sans JP',sans-serif", fontSize: '12px', lineHeight: 1.8,
+            }}>
+              ⏳ 生成中…しばらくお待ちください
+            </div>
+          )}
+        </>
       )}
     </div>
   )
