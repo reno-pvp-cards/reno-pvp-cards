@@ -610,17 +610,28 @@ function CardView({ player, theme, onEdit }) {
       fillRect(0, 140, W, 160, fadeGrad)
 
       // プレイヤー名エリア（スクショ下部）
-      text('Crystal Conflict Player', 18, 252, '600 10px "Barlow Condensed"', ac)
+      // プレビュー準拠: bottom:12px からの絶対位置 → y=300-12=288 基準
+      ctx.textBaseline = 'alphabetic'
+      // "Crystal Conflict Player" ラベル: 10px, 名前28pxの上に1px margin
+      // 名前下端: 300-12=288, 名前top=288-28=260, ラベル下端=260-1-3=256(概算)
+      ctx.letterSpacing = '0.2em'
+      text('CRYSTAL CONFLICT PLAYER', 18, 257, '500 10px "Barlow Condensed"', ac)
+      ctx.letterSpacing = '0px'
       const fullName = ((player.firstName || 'First') + ' ' + (player.lastName || 'Last')).trim()
-      text(fullName, 18, 283, '700 28px "Barlow Condensed"', t.playerNameColor)
-      if (player.nickname) text(player.nickname, 18, 298, '13px "Noto Sans JP"', t.value)
+      text(fullName, 18, 286, '700 28px "Barlow Condensed"', t.playerNameColor)
+      if (player.nickname) {
+        ctx.textBaseline = 'alphabetic'
+        text(player.nickname, 18, 299, '13px "Noto Sans JP"', t.value)
+      }
 
-      // ランクバッジ
+      // ランクバッジ (top:14, right:14, w:56+padding, h:54+padding)
       const rank = player.highestRank
       if (rank) {
-        roundRect(W - 84, 12, 70, 54, 10, t.rankBadgeBg, ac + '66')
-        text(RANK_CONFIG[rank]?.icon || '', W - 49, 42, '20px serif', '#fff', 'center')
-        text(rank, W - 49, 58, '700 11px "Noto Sans JP"', ac, 'center')
+        roundRect(W - 84, 14, 70, 56, 10, t.rankBadgeBg, ac + '66')
+        ctx.textBaseline = 'middle'
+        text(RANK_CONFIG[rank]?.icon || '', W - 49, 38, '22px serif', '#fff', 'center')
+        ctx.textBaseline = 'alphabetic'
+        text(rank, W - 49, 62, '700 11px "Noto Sans JP"', ac, 'center')
       }
 
       // トップアクセントライン
@@ -629,63 +640,76 @@ function CardView({ player, theme, onEdit }) {
       fillRect(0, 0, W, 2, lineGrad)
 
       // ── 情報エリア (300〜800px) ───────────────────────
-      let cy = 308  // 現在のy位置
+      // プレビューDOM準拠: padding 8px 16px, gap 6px
+      let cy = 308
 
-      // SERVER / TEAM ボックス
-      roundRect(16, cy, W - 32, 38, 8, t.sectionBg, t.border)
-      text('SERVER', 26, cy + 11, '700 9px "Barlow Condensed"', t.label)
-      text(player.server || '—', 26, cy + 27, '600 13px "Noto Sans JP"', t.value)
-      // 区切り線
-      ctx.strokeStyle = t.border; ctx.lineWidth = 1
-      ctx.beginPath(); ctx.moveTo(W/2, cy + 6); ctx.lineTo(W/2, cy + 32); ctx.stroke()
-      text('TEAM', W/2 + 12, cy + 11, '700 9px "Barlow Condensed"', t.label)
-      text(player.team || '—', W/2 + 12, cy + 27, '600 13px "Noto Sans JP"', t.value)
-      cy += 46
-
-      // JOBS
-      text('JOBS', 16, cy + 10, '600 11px "Barlow Condensed"', t.label)
-      cy += 14
-      // タグ描画ヘルパー
+      // タグ描画ヘルパー（プレビューに合わせた寸法）
+      // tagH=20px, pad水平8px, 行間4px, 最小幅34px
       const drawTags = (tags, startY) => {
+        const pad = 8, tagH = 20, gap = 4, fontSize = 9
         let tx = 16, ty = startY
         tags.forEach(({ label, type }) => {
-          const pad = 8, fontSize = 9
-          ctx.font = `${type === 'main' ? 700 : 500} ${fontSize}px "Noto Sans JP"`
+          const fw = type === 'main' ? 700 : 500
+          ctx.font = `${fw} ${fontSize}px "Noto Sans JP"`
           const tw = ctx.measureText(label).width + pad * 2
-          const tagW = Math.max(tw, 34), tagH = 16
-          if (tx + tagW > W - 16) { tx = 16; ty += tagH + 4 }
+          const tagW = Math.max(tw, 34)
+          if (tx + tagW > W - 16) { tx = 16; ty += tagH + gap }
           let bg, border, fg
           if (type === 'main')     { bg = t.inactiveTagBg; border = ac + '88'; fg = ac }
           else if (type === 'sub') { bg = ac + '22';       border = ac + '88'; fg = ac }
           else                     { bg = t.inactiveTagBg; border = t.inactiveTagBorder; fg = t.inactiveTagText }
-          roundRect(tx, ty, tagW, tagH, 8, bg, border)
-          text(label, tx + tagW/2, ty + tagH - 4, `${type === 'main' ? 700 : 500} ${fontSize}px "Noto Sans JP"`, fg, 'center')
-          tx += tagW + 4
+          roundRect(tx, ty, tagW, tagH, 10, bg, border)
+          // テキストベースライン: タグ中央に合わせる
+          ctx.font = `${fw} ${fontSize}px "Noto Sans JP"`
+          ctx.fillStyle = fg; ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(label, tx + tagW / 2, ty + tagH / 2)
+          ctx.textBaseline = 'alphabetic'
+          tx += tagW + gap
         })
-        return ty + 20
+        return ty + tagH  // 最後の行のtop + tagH
       }
+
+      // SERVER / TEAM ボックス (height: 4+10+14=46 → padding 4px 10px)
+      const stH = 46
+      roundRect(16, cy, W - 32, stH, 8, t.sectionBg, t.border)
+      ctx.textBaseline = 'alphabetic'
+      text('SERVER', 26, cy + 14, '700 9px "Barlow Condensed"', t.label)
+      text(player.server || '—', 26, cy + 32, '600 13px "Noto Sans JP"', t.value)
+      ctx.strokeStyle = t.border; ctx.lineWidth = 1
+      ctx.beginPath(); ctx.moveTo(W / 2, cy + 8); ctx.lineTo(W / 2, cy + stH - 8); ctx.stroke()
+      text('TEAM', W / 2 + 12, cy + 14, '700 9px "Barlow Condensed"', t.label)
+      text(player.team || '—', W / 2 + 12, cy + 32, '600 13px "Noto Sans JP"', t.value)
+      cy += stH + 6  // gap 6px
+
+      // JOBS セクション
+      ctx.textBaseline = 'alphabetic'
+      text('JOBS', 16, cy + 11, '600 11px "Barlow Condensed"', t.label)
+      cy += 16
       const jobTags = ALL_JOBS.map(j => ({
         label: j === player.mainJob ? '★ ' + j : j,
         type: j === player.mainJob ? 'main' : player.subJobs.includes(j) ? 'sub' : 'inactive'
       }))
-      cy = drawTags(jobTags, cy)
-      cy += 4
+      cy = drawTags(jobTags, cy) + 6  // gap 6px
 
-      // PLAY STYLE
-      text('PLAY STYLE', 16, cy + 10, '600 11px "Barlow Condensed"', t.label)
-      cy += 14
+      // PLAY STYLE セクション
+      ctx.textBaseline = 'alphabetic'
+      text('PLAY STYLE', 16, cy + 11, '600 11px "Barlow Condensed"', t.label)
+      cy += 16
       const psTags = PLAYSTYLE_LIST.map(ps => ({
         label: ps, type: player.playstyle.includes(ps) ? 'sub' : 'inactive'
       }))
-      cy = drawTags(psTags, cy)
-      cy += 4
+      cy = drawTags(psTags, cy) + 6
 
-      // NOTE
-      text('NOTE', 16, cy + 10, '600 11px "Barlow Condensed"', t.label)
-      cy += 14
-      roundRect(16, cy, W - 32, 52, 8, t.noteBg, t.noteBorder)
+      // NOTE セクション (height: 52px, padding 6px 10px)
+      ctx.textBaseline = 'alphabetic'
+      text('NOTE', 16, cy + 11, '600 11px "Barlow Condensed"', t.label)
+      cy += 16
+      const noteH = 52
+      roundRect(16, cy, W - 32, noteH, 8, t.noteBg, t.noteBorder)
       if (player.freeText) {
-        ctx.font = '11px "Noto Sans JP"'; ctx.fillStyle = t.value; ctx.textAlign = 'left'
+        ctx.font = '11px "Noto Sans JP"'; ctx.fillStyle = t.value
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
         const lines = []
         let line = ''
         for (const ch of player.freeText) {
@@ -694,21 +718,21 @@ function CardView({ player, theme, onEdit }) {
           else line += ch
         }
         lines.push(line)
-        lines.slice(0, 3).forEach((l, i) => ctx.fillText(l, 26, cy + 16 + i * 17))
+        lines.slice(0, 3).forEach((l, i) => ctx.fillText(l, 26, cy + 17 + i * 17))
       }
-      cy += 60
+      cy += noteH + 6
 
       // SNS タグ
       const snsTags = SNS_LIST.map(s => ({ label: s, type: player.sns.includes(s) ? 'sub' : 'inactive' }))
-      cy = drawTags(snsTags, cy)
-      cy += 4
+      cy = drawTags(snsTags, cy) + 6
 
-      // フッター
+      // フッター区切り線
+      ctx.textBaseline = 'alphabetic'
       ctx.strokeStyle = t.border; ctx.lineWidth = 1
       ctx.beginPath(); ctx.moveTo(16, cy); ctx.lineTo(W - 16, cy); ctx.stroke()
       cy += 8
-      text('CC PLAYER CARD', 16, cy + 10, '700 11px "Barlow Condensed"', ac)
-      text('FINAL FANTASY XIV © SQUARE ENIX', 16, cy + 22, '9px "Barlow Condensed"', t.label)
+      text('CC PLAYER CARD', 16, cy + 11, '700 11px "Barlow Condensed"', ac)
+      text('FINAL FANTASY XIV © SQUARE ENIX', 16, cy + 23, '9px "Barlow Condensed"', t.label)
 
       const dataUrl = cv.toDataURL('image/png')
       setCardImgSrc(dataUrl)
