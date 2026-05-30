@@ -541,11 +541,33 @@ function CardView({ player, theme, onEdit }) {
     setGenerating(true)
     setCardImgSrc(null)
     try {
-      await new Promise(r => setTimeout(r, 200))
+      await document.fonts.ready
       const { default: domtoimage } = await import('dom-to-image-more')
       const imgEl = cardRef.current.querySelector('img[data-screenshot]')
-      if (imgEl) { try { await imgEl.decode() } catch(e) {} }
-      await new Promise(r => setTimeout(r, 100))
+
+      if (imgEl && player.screenshotDataUrl) {
+        // iOSキャッシュ対策：先にImageオブジェクトで読み込んでキャッシュさせる
+        await new Promise(resolve => {
+          const cacheImg = new Image()
+          cacheImg.onload = resolve
+          cacheImg.onerror = resolve
+          cacheImg.src = player.screenshotDataUrl
+          setTimeout(resolve, 3000)
+        })
+        // DOM上の画像の描画完了を待つ
+        await new Promise(resolve => {
+          const check = () => {
+            if (imgEl.complete && imgEl.naturalWidth > 0) resolve()
+            else requestAnimationFrame(check)
+          }
+          check()
+          setTimeout(resolve, 3000)
+        })
+        try { await imgEl.decode() } catch(e) {}
+      }
+
+      // レンダリング安定待ち
+      await new Promise(r => setTimeout(r, 500))
       const dataUrl = await domtoimage.toPng(cardRef.current, { scale: 2, cacheBust: true })
       setCardImgSrc(dataUrl)
       setShowSave(true)
