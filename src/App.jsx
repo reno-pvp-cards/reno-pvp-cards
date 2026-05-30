@@ -8,7 +8,7 @@ const JOB_LIST = {
   魔法DPS: ['黒魔道士', '召喚士', '赤魔道士', 'ピクトマンサー'],
 }
 const ALL_JOBS = Object.values(JOB_LIST).flat()
-const PLAYSTYLE_LIST = ['ターゲッター', 'サポート重視', '火力重視', 'オールラウンダー', 'クリスタル運びます！', '粘り型']
+const PLAYSTYLE_LIST = ['ターゲッター', 'サポート重視', '火力重視', 'オールラウンダー', 'クリスタルを運びます！', '粘り型']
 const SNS_LIST = ['X', 'YouTube', 'Twitch']
 const RANK_LIST = ['アルテマ', 'オメガ', 'クリスタル', 'ダイヤモンド', 'プラチナ', 'ゴールド', 'シルバー', 'ブロンズ']
 const RANK_CONFIG = {
@@ -234,7 +234,7 @@ function PlayerCard({ player, theme, cardRef }) {
   }
   const activeTag   = { ...tagBase, background: ac + '22', borderColor: ac + '88', color: ac }
   const inactiveTag = { ...tagBase, background: t.inactiveTagBg, borderColor: t.inactiveTagBorder, color: t.inactiveTagText }
-  const mainTag     = { ...tagBase, background: t.inactiveTagBg, borderColor: ac + '88', color: ac, fontWeight: 700 }
+  const mainTag     = { ...tagBase, background: ac + '33', borderColor: ac + '88', color: ac, fontWeight: 700 }
 
   return (
     <div ref={cardRef} style={{
@@ -608,7 +608,7 @@ function CardView({ player, theme, onEdit }) {
           const tw = Math.max(ctx.measureText(label).width + hpad * 2, TAG_MINW)
           if (tx + tw > W - 16) { tx = 16; ty += TAG_PITCH }
           let bg, border, fg
-          if (type === 'main')     { bg = t.inactiveTagBg; border = ac + '88'; fg = ac }
+          if (type === 'main')     { bg = ac + '33'; border = ac + '88'; fg = ac }
           else if (type === 'sub') { bg = ac + '22';       border = ac + '88'; fg = ac }
           else                     { bg = t.inactiveTagBg; border = t.inactiveTagBorder; fg = t.inactiveTagText }
           roundRect(tx, ty, tw, TAG_H, TAG_H / 2, bg, border)
