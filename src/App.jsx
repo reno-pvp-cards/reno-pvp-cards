@@ -243,11 +243,8 @@ function PlayerCard({ player, theme, cardRef }) {
       {/* スクショ 300px */}
       <div style={{ position: 'relative', height: '300px', overflow: 'hidden' }}>
         {player.screenshotDataUrl ? (
-          <div data-screenshot style={{
-            width: '100%', height: '100%',
-            backgroundImage: `url(${player.screenshotDataUrl})`,
-            backgroundSize: 'cover', backgroundPosition: 'center top', backgroundRepeat: 'no-repeat',
-          }} />
+          <img data-screenshot src={player.screenshotDataUrl} alt="ss"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
         ) : (
           <div style={{
             width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -544,23 +541,48 @@ function CardView({ player, theme, onEdit }) {
     setGenerating(true)
     setCardImgSrc(null)
 
+    // 画像をCanvasでcover/center-topクロップ → 差し替え用dataURLを生成
+    const cropImageToFit = (src, targetW, targetH) => new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => {
+        const srcRatio = img.width / img.height
+        const tgtRatio = targetW / targetH
+        let sx, sy, sw, sh
+        if (srcRatio > tgtRatio) {
+          // 横が余る → 中央クロップ
+          sh = img.height; sw = sh * tgtRatio
+          sy = 0; sx = (img.width - sw) / 2
+        } else {
+          // 縦が余る → 上基準クロップ
+          sw = img.width; sh = sw / tgtRatio
+          sx = 0; sy = 0
+        }
+        const cv = document.createElement('canvas')
+        cv.width = targetW * 2; cv.height = targetH * 2
+        const ctx = cv.getContext('2d')
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, cv.width, cv.height)
+        resolve(cv.toDataURL('image/png'))
+      }
+      img.onerror = reject
+      img.src = src
+    })
+
     try {
       await document.fonts.ready
 
-      // スクショがある場合：html2canvas用にImageオブジェクトへ事前デコード
-      if (player.screenshotDataUrl) {
-        await new Promise((resolve, reject) => {
-          const img = new Image()
-          img.onload = async () => {
-            try { await img.decode() } catch(e) {}
-            resolve()
-          }
-          img.onerror = reject
-          img.src = player.screenshotDataUrl
-        })
+      // スクショをクロップ済みdataURLに差し替え
+      let croppedUrl = null
+      const imgEl = cardRef.current.querySelector('img[data-screenshot]')
+      if (imgEl && player.screenshotDataUrl) {
+        croppedUrl = await cropImageToFit(player.screenshotDataUrl, 420, 300)
+        // 差し替え（html2canvasが読み込む前に確定させる）
+        imgEl.src = croppedUrl
+        imgEl.style.objectFit = 'fill'
+        imgEl.style.objectPosition = 'unset'
+        try { await imgEl.decode() } catch(e) {}
       }
 
-      // html2canvas を動的ロード（未ロードなら scriptタグで注入）
+      // html2canvas を動的ロード
       if (!window.html2canvas) {
         await new Promise((resolve, reject) => {
           const s = document.createElement('script')
@@ -572,8 +594,6 @@ function CardView({ player, theme, onEdit }) {
       }
       const html2canvas = window.html2canvas
 
-      // html2canvas でキャプチャ
-      // useCORS不要（base64 dataURLは同一オリジン扱い）、allowTaint:trueで確実に描画
       const canvas = await html2canvas(cardRef.current, {
         scale: 2,
         useCORS: false,
@@ -590,6 +610,13 @@ function CardView({ player, theme, onEdit }) {
       console.error('render error:', err)
       alert('画像生成に失敗しました。再試行してください。')
     } finally {
+      // imgElのsrcとstyleを元に戻す
+      const imgEl = cardRef.current?.querySelector('img[data-screenshot]')
+      if (imgEl && player.screenshotDataUrl) {
+        imgEl.src = player.screenshotDataUrl
+        imgEl.style.objectFit = 'cover'
+        imgEl.style.objectPosition = 'center top'
+      }
       setGenerating(false)
     }
   }, [player, theme])
