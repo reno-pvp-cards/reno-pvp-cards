@@ -33,6 +33,14 @@ const emptyPlayer = {
   team: '', screenshotDataUrl: '', freeText: '', sns: [],
 }
 
+// カード寸法の基準（4:5 / Xタイムライン最適）
+// 論理サイズ CARD_W×CARD_H を表示に使い、出力はscaleで高解像度化
+const CARD_W = 432          // 論理幅
+const CARD_H = 540          // 論理高さ（4:5）
+const CARD_SCALE = 2.5      // 出力 = 1080×1350
+const SS_HEIGHT = 180       // スクショエリア高さ（4:5・情報エリアにゆとり）
+
+
 const DARK_COLOR  = '#a8d8ea'
 const LIGHT_COLOR = '#e87db0'
 
@@ -230,7 +238,7 @@ function PlayerCard({ player, theme, cardRef }) {
 
   return (
     <div ref={cardRef} style={{
-      width: '420px', height: '800px', background: t.cardBg, position: 'relative',
+      width: `${CARD_W}px`, height: `${CARD_H}px`, background: t.cardBg, position: 'relative',
       overflow: 'hidden', flexShrink: 0, animation: 'fadeUp 0.5s ease',
       fontFamily: "'Barlow Condensed','Rajdhani','Noto Sans JP',sans-serif",
     }}>
@@ -240,8 +248,8 @@ function PlayerCard({ player, theme, cardRef }) {
         backgroundSize: '200% auto', animation: 'shimmer 3s linear infinite',
       }} />
 
-      {/* スクショ 300px */}
-      <div style={{ position: 'relative', height: '300px', overflow: 'hidden' }}>
+      {/* スクショ */}
+      <div style={{ position: 'relative', height: `${SS_HEIGHT}px`, overflow: 'hidden' }}>
         {player.screenshotDataUrl ? (
           <img data-screenshot src={player.screenshotDataUrl} alt="ss"
             style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
@@ -256,7 +264,7 @@ function PlayerCard({ player, theme, cardRef }) {
           </div>
         )}
         <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0, height: '160px', pointerEvents: 'none',
+          position: 'absolute', bottom: 0, left: 0, right: 0, height: '100px', pointerEvents: 'none',
           background: `linear-gradient(to top, ${t.cardBg} 0%, ${t.cardBg}cc 30%, transparent 100%)`,
         }} />
         <div style={{ position: 'absolute', bottom: '12px', left: '18px', right: '20px', textAlign: 'left' }}>
@@ -278,8 +286,8 @@ function PlayerCard({ player, theme, cardRef }) {
         )}
       </div>
 
-      {/* 情報エリア 500px */}
-      <div style={{ height: '500px', padding: '8px 16px 10px', display: 'flex', flexDirection: 'column', gap: '6px', overflow: 'hidden' }}>
+      {/* 情報エリア */}
+      <div style={{ height: `${CARD_H - SS_HEIGHT}px`, padding: '8px 16px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', overflow: 'hidden' }}>
         <div style={{ background: t.sectionBg, border: `1px solid ${t.border}`, borderRadius: '8px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '0' }}>
           {[{ label: 'SERVER', value: player.server || '—' }, { label: 'TEAM', value: player.team || '—' }].map(({ label, value }, i) => (
             <div key={label} style={{ flex: 1, borderLeft: i === 1 ? `1px solid ${t.border}` : 'none', paddingLeft: i === 1 ? '12px' : '0', marginLeft: i === 1 ? '12px' : '0', textAlign: 'left' }}>
@@ -469,7 +477,7 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
               <div>
                 {/* カードと同じ比率でプレビュー */}
                 <div style={{
-                  width: '100%', aspectRatio: '420 / 300', borderRadius: '10px',
+                  width: '100%', aspectRatio: `${CARD_W} / ${SS_HEIGHT}`, borderRadius: '10px',
                   overflow: 'hidden', marginBottom: '8px', border: `1px solid ${t.border}`,
                 }}>
                   <img src={form.screenshotDataUrl} alt="preview" style={{
@@ -553,9 +561,9 @@ function CardView({ player, theme, onEdit }) {
     try {
       await document.fonts.ready
 
-      const S = 2
-      const W = 420, H = 800   // 固定サイズ（絶対）
-      const SS_H = 300         // スクショエリア
+      const S = CARD_SCALE
+      const W = CARD_W, H = CARD_H   // 論理サイズ（出力は W*S × H*S = 1080×1350）
+      const SS_H = SS_HEIGHT         // スクショエリア
       const cv = document.createElement('canvas')
       cv.width = W * S; cv.height = H * S
       const ctx = cv.getContext('2d')
@@ -631,12 +639,12 @@ function CardView({ player, theme, onEdit }) {
         txt('NO IMAGE', W / 2, SS_H / 2, '13px "Noto Sans JP"', t.label, 'center', 'middle')
       }
 
-      // フェードオーバーレイ（DOM: height160, to-top, cardBg→cardBgcc(30%)→transparent）
-      const fadeGrad = ctx.createLinearGradient(0, SS_H, 0, SS_H - 160)
+      // フェードオーバーレイ（DOM: height100, to-top, cardBg→cardBgcc(30%)→transparent）
+      const fadeGrad = ctx.createLinearGradient(0, SS_H, 0, SS_H - 100)
       fadeGrad.addColorStop(0, t.cardBg)
       fadeGrad.addColorStop(0.3, t.cardBg + 'cc')
       fadeGrad.addColorStop(1, 'transparent')
-      fillRect(0, SS_H - 160, W, 160, fadeGrad)
+      fillRect(0, SS_H - 100, W, 100, fadeGrad)
 
       // プレイヤー名（DOM: bottom12px, left18px）
       ctx.textBaseline = 'alphabetic'
@@ -659,16 +667,58 @@ function CardView({ player, theme, onEdit }) {
       lineGrad.addColorStop(0, 'transparent'); lineGrad.addColorStop(0.5, ac); lineGrad.addColorStop(1, 'transparent')
       fillRect(0, 0, W, 2, lineGrad)
 
-      // ── 情報エリア (300〜800px / padding 8px 16px 10px, gap 6px) ──
-      const GAP = 6
-      let cy = SS_H + 8   // padding-top 8px
+      // ── 情報エリア (300〜800px / padding 8px 16px 10px) ──
+      // CSS space-between 相当: 各セクション高さを計測し、余白を均等分配
+      const INFO_TOP = SS_H + 8           // padding-top 8px
+      const INFO_BOTTOM = H - 10          // padding-bottom 10px
+      const LABEL_H = 13 + 2              // セクションラベル高さ+marginBottom
+      const stH = 46, noteH = 52
 
-      // SERVER / TEAM（DOM padding 4px 10px → 高さ約46px）
-      const stH = 46
-      roundRect(16, cy, W - 32, stH, 8, t.sectionBg, t.border)
-      ctx.textBaseline = 'alphabetic'
-      // 値を枠幅に収めて描画（はみ出す場合フォント縮小）
-      const colInnerW = (W - 32) / 2 - 24  // 各カラムの内側幅（padding/区切り考慮）
+      // タグ行数から高さを計測するヘルパー（描画せず高さのみ）
+      const measureTagsH = (tags) => {
+        const pad = 8, minw = 34
+        let tx = 16, rows = 1
+        tags.forEach(({ label, small }) => {
+          const hpad = small ? 6 : pad
+          ctx.font = `500 9px "Noto Sans JP"`
+          const tw = Math.max(ctx.measureText(label).width + hpad * 2, minw)
+          if (tx + tw > W - 16) { tx = 16; rows++ }
+          tx += tw + 4
+        })
+        return rows * TAG_H + (rows - 1) * (TAG_PITCH - TAG_H)  // = rows*17 + (rows-1)*4
+      }
+
+      const jobTags = ALL_JOBS.map(j => ({
+        label: j === player.mainJob ? '★ ' + j : j,
+        type: j === player.mainJob ? 'main' : player.subJobs.includes(j) ? 'sub' : 'inactive'
+      }))
+      const psTags = PLAYSTYLE_LIST.map(ps => ({
+        label: ps, type: player.playstyle.includes(ps) ? 'sub' : 'inactive'
+      }))
+      const snsTags = SNS_LIST.map(s => ({
+        label: s, type: player.sns.includes(s) ? 'sub' : 'inactive', small: true
+      }))
+
+      // 各セクションの高さ
+      const jobsH = LABEL_H + measureTagsH(jobTags)
+      const psH   = LABEL_H + measureTagsH(psTags)
+      const noteSecH = LABEL_H + noteH
+      const snsH  = measureTagsH(snsTags)
+      const footerH = 1 + 6 + 11 + 12  // 線 + paddingTop6 + テキスト2行ぶん
+      const footerMarginTop = 4
+
+      // セクションは6ブロック: SERVER/TEAM, JOBS, PLAY STYLE, NOTE, SNS, フッター
+      const blockHeights = [stH, jobsH, psH, noteSecH, snsH, footerMarginTop + footerH]
+      const totalContent = blockHeights.reduce((a, b) => a + b, 0)
+      const available = INFO_BOTTOM - INFO_TOP
+      const gapCount = blockHeights.length - 1
+      // 余白を均等分配。コンテンツがはみ出す場合は最低2pxでクランプ
+      const gap = Math.max(2, (available - totalContent) / gapCount)
+
+      let cy = INFO_TOP
+
+      // 値フィット描画
+      const colInnerW = (W - 32) / 2 - 24
       const fitValue = (str, x, y) => {
         let fs = 13
         ctx.font = `600 ${fs}px "Noto Sans JP"`
@@ -678,39 +728,33 @@ function CardView({ player, theme, onEdit }) {
         }
         txt(str, x, y, `600 ${fs}px "Noto Sans JP"`, t.value)
       }
+      const drawSectionLabel = (label) => {
+        ctx.textBaseline = 'alphabetic'
+        txt(label, 16, cy + 10, '600 11px "Barlow Condensed"', t.label)
+        cy += LABEL_H
+      }
+
+      // ① SERVER / TEAM
+      roundRect(16, cy, W - 32, stH, 8, t.sectionBg, t.border)
+      ctx.textBaseline = 'alphabetic'
       txt('SERVER', 26, cy + 14, '700 9px "Barlow Condensed"', t.label)
       fitValue(player.server || '—', 26, cy + 31)
       ctx.strokeStyle = t.border; ctx.lineWidth = 1
       ctx.beginPath(); ctx.moveTo(W / 2, cy + 8); ctx.lineTo(W / 2, cy + stH - 8); ctx.stroke()
       txt('TEAM', W / 2 + 12, cy + 14, '700 9px "Barlow Condensed"', t.label)
       fitValue(player.team || '—', W / 2 + 12, cy + 31)
-      cy += stH + GAP
+      cy += stH + gap
 
-      // セクションラベル（DOM: fontSize11, marginBottom2 → ラベル高さ約13px）
-      const drawSectionLabel = (label) => {
-        ctx.textBaseline = 'alphabetic'
-        txt(label, 16, cy + 10, '600 11px "Barlow Condensed"', t.label)
-        cy += 13 + 2  // ラベル高さ+marginBottom
-      }
-
-      // JOBS
+      // ② JOBS
       drawSectionLabel('JOBS')
-      const jobTags = ALL_JOBS.map(j => ({
-        label: j === player.mainJob ? '★ ' + j : j,
-        type: j === player.mainJob ? 'main' : player.subJobs.includes(j) ? 'sub' : 'inactive'
-      }))
-      cy = drawTags(jobTags, cy) + GAP
+      cy = drawTags(jobTags, cy) + gap
 
-      // PLAY STYLE
+      // ③ PLAY STYLE
       drawSectionLabel('PLAY STYLE')
-      const psTags = PLAYSTYLE_LIST.map(ps => ({
-        label: ps, type: player.playstyle.includes(ps) ? 'sub' : 'inactive'
-      }))
-      cy = drawTags(psTags, cy) + GAP
+      cy = drawTags(psTags, cy) + gap
 
-      // NOTE
+      // ④ NOTE
       drawSectionLabel('NOTE')
-      const noteH = 52
       roundRect(16, cy, W - 32, noteH, 8, t.noteBg, t.noteBorder)
       if (player.freeText) {
         ctx.font = '11px "Noto Sans JP"'
@@ -725,16 +769,13 @@ function CardView({ player, theme, onEdit }) {
         lines.push(line)
         lines.slice(0, 3).forEach((l, i) => ctx.fillText(l, 26, cy + 16 + i * 17))
       }
-      cy += noteH + GAP
+      cy += noteH + gap
 
-      // SNS（DOM: padding 1px 6px, gap 4px）
-      const snsTags = SNS_LIST.map(s => ({
-        label: s, type: player.sns.includes(s) ? 'sub' : 'inactive', small: true
-      }))
-      cy = drawTags(snsTags, cy) + GAP
+      // ⑤ SNS
+      cy = drawTags(snsTags, cy) + gap
 
-      // フッター（DOM: marginTop4, borderTop, paddingTop6）
-      cy += 4
+      // ⑥ フッター
+      cy += footerMarginTop
       ctx.strokeStyle = t.border; ctx.lineWidth = 1; ctx.textBaseline = 'alphabetic'
       ctx.beginPath(); ctx.moveTo(16, cy); ctx.lineTo(W - 16, cy); ctx.stroke()
       cy += 6
@@ -773,7 +814,7 @@ function CardView({ player, theme, onEdit }) {
     return (
       <div style={{ minHeight: '100vh', background: t.pageBg, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px 40px' }}>
         <img src={cardImgSrc} alt="Generated card" style={{
-          width: '420px', maxWidth: '100%', display: 'block',
+          width: `${CARD_W}px`, maxWidth: '100%', display: 'block',
           borderRadius: '4px', border: `1px solid ${t.border}`, animation: 'fadeIn 0.4s ease',
         }} />
         <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -795,7 +836,7 @@ function CardView({ player, theme, onEdit }) {
           }}>{generating ? '生成中...' : '↺ 再生成'}</button>
         </div>
         <div style={{
-          width: '420px', maxWidth: '100%', marginTop: '12px',
+          width: `${CARD_W}px`, maxWidth: '100%', marginTop: '12px',
           background: t.accentColor + '12', border: `1px solid ${t.accentColor}35`,
           borderRadius: '8px', padding: '8px 14px',
           color: t.label, fontFamily: "'Noto Sans JP',sans-serif", fontSize: '11px', lineHeight: 1.8,
