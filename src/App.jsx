@@ -284,7 +284,7 @@ function PlayerCard({ player, theme, cardRef }) {
           {[{ label: 'SERVER', value: player.server || '—' }, { label: 'TEAM', value: player.team || '—' }].map(({ label, value }, i) => (
             <div key={label} style={{ flex: 1, borderLeft: i === 1 ? `1px solid ${t.border}` : 'none', paddingLeft: i === 1 ? '12px' : '0', marginLeft: i === 1 ? '12px' : '0', textAlign: 'left' }}>
               <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.15em', color: t.label, textTransform: 'uppercase', fontFamily: "'Barlow Condensed',sans-serif", marginBottom: '1px' }}>{label}</div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: t.value, fontFamily: "'Noto Sans JP',sans-serif", lineHeight: 1.3 }}>{value}</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: t.value, fontFamily: "'Noto Sans JP',sans-serif", lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</div>
             </div>
           ))}
         </div>
@@ -329,13 +329,23 @@ function PlayerCard({ player, theme, cardRef }) {
 
 function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
   const t = THEME[theme]
-  const [form, setForm] = useState({ ...initialData })
+  const [form, setForm] = useState(() => {
+    const d = { ...initialData }
+    if (d.mainJob && Array.isArray(d.subJobs)) {
+      d.subJobs = d.subJobs.filter(j => j !== d.mainJob)
+    }
+    return d
+  })
   const fileRef = useRef()
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
   const toggleArr = (key, val) => setForm(f => {
     const arr = f[key]
     return { ...f, [key]: arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val] }
   })
+  // メインジョブ設定時：そのジョブが使用ジョブに含まれていたら除外
+  const setMainJob = (val) => setForm(f => ({
+    ...f, mainJob: val, subJobs: f.subJobs.filter(j => j !== val),
+  }))
   const handleFile = (e) => {
     const file = e.target.files[0]
     if (!file) return
@@ -414,7 +424,7 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
           {/* メインジョブ */}
           <div>
             <SectionLabel theme={theme}>メインジョブ</SectionLabel>
-            <CustomSelect value={form.mainJob} onChange={v => set('mainJob', v)} options={jobOptions} placeholder="選択" theme={theme} />
+            <CustomSelect value={form.mainJob} onChange={v => setMainJob(v)} options={jobOptions} placeholder="選択" theme={theme} />
           </div>
 
           {/* 使用ジョブ */}
@@ -657,12 +667,23 @@ function CardView({ player, theme, onEdit }) {
       const stH = 46
       roundRect(16, cy, W - 32, stH, 8, t.sectionBg, t.border)
       ctx.textBaseline = 'alphabetic'
+      // 値を枠幅に収めて描画（はみ出す場合フォント縮小）
+      const colInnerW = (W - 32) / 2 - 24  // 各カラムの内側幅（padding/区切り考慮）
+      const fitValue = (str, x, y) => {
+        let fs = 13
+        ctx.font = `600 ${fs}px "Noto Sans JP"`
+        while (ctx.measureText(str).width > colInnerW && fs > 9) {
+          fs -= 0.5
+          ctx.font = `600 ${fs}px "Noto Sans JP"`
+        }
+        txt(str, x, y, `600 ${fs}px "Noto Sans JP"`, t.value)
+      }
       txt('SERVER', 26, cy + 14, '700 9px "Barlow Condensed"', t.label)
-      txt(player.server || '—', 26, cy + 31, '600 13px "Noto Sans JP"', t.value)
+      fitValue(player.server || '—', 26, cy + 31)
       ctx.strokeStyle = t.border; ctx.lineWidth = 1
       ctx.beginPath(); ctx.moveTo(W / 2, cy + 8); ctx.lineTo(W / 2, cy + stH - 8); ctx.stroke()
       txt('TEAM', W / 2 + 12, cy + 14, '700 9px "Barlow Condensed"', t.label)
-      txt(player.team || '—', W / 2 + 12, cy + 31, '600 13px "Noto Sans JP"', t.value)
+      fitValue(player.team || '—', W / 2 + 12, cy + 31)
       cy += stH + GAP
 
       // セクションラベル（DOM: fontSize11, marginBottom2 → ラベル高さ約13px）
