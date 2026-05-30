@@ -628,8 +628,10 @@ function CardView({ player, theme, onEdit }) {
         const img = await loadImg(player.screenshotDataUrl)
         const srcR = img.width / img.height, tgtR = W / SS_H
         let sx, sy, sw, sh
+        // DOM は objectPosition: "center top" → 横は中央寄せ、縦は上端固定
         if (srcR > tgtR) { sh = img.height; sw = sh * tgtR; sy = 0; sx = (img.width - sw) / 2 }
         else             { sw = img.width;  sh = sw / tgtR;  sx = 0; sy = 0 }
+        // ※縦長画像（else分岐）は sy=0（上端固定）で DOM の center-top と一致
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, SS_H)
       } else {
         const grad = ctx.createLinearGradient(0, 0, W, SS_H)
@@ -678,9 +680,11 @@ function CardView({ player, theme, onEdit }) {
       const measureTagsH = (tags) => {
         const pad = 8, minw = 34
         let tx = 16, rows = 1
-        tags.forEach(({ label, small }) => {
+        tags.forEach(({ label, type, small }) => {
+          // drawTags と同じ weight を使って幅を計測（main=700, それ以外=500）
+          const fw = type === 'main' ? 700 : 500
           const hpad = small ? 6 : pad
-          ctx.font = `500 9px "Noto Sans JP"`
+          ctx.font = `${fw} 9px "Noto Sans JP"`
           const tw = Math.max(ctx.measureText(label).width + hpad * 2, minw)
           if (tx + tw > W - 16) { tx = 16; rows++ }
           tx += tw + 4
