@@ -319,9 +319,7 @@ function PlayerCard({ player, theme, cardRef }) {
           })}
         </div>
         <div style={{ marginTop: '4px', borderTop: `1px solid ${t.border}`, paddingTop: '6px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: ac, textTransform: 'uppercase' }}>CC Player Card</div>
-          <div style={{ fontSize: '9px', color: t.label, marginTop: '1px', letterSpacing: '0.05em' }}>FINAL FANTASY XIV © SQUARE ENIX</div>
-        </div>
+<div style={{ fontSize: '9px', color: t.label, letterSpacing: '0.08em' }}>FINAL FANTASY XIV © SQUARE ENIX</div>        </div>
       </div>
     </div>
   )
