@@ -319,7 +319,8 @@ function PlayerCard({ player, theme, cardRef }) {
           })}
         </div>
         <div style={{ marginTop: '4px', borderTop: `1px solid ${t.border}`, paddingTop: '6px' }}>
-<div style={{ fontSize: '9px', color: t.label, letterSpacing: '0.08em' }}>FINAL FANTASY XIV © SQUARE ENIX</div>        </div>
+          <div style={{ fontSize: '9px', color: t.label, letterSpacing: '0.08em' }}>FINAL FANTASY XIV © SQUARE ENIX</div>
+        </div>
       </div>
     </div>
   )
