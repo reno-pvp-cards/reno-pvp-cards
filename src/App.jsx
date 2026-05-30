@@ -319,7 +319,8 @@ function PlayerCard({ player, theme, cardRef }) {
           })}
         </div>
         <div style={{ marginTop: '4px', borderTop: `1px solid ${t.border}`, paddingTop: '6px' }}>
-          <div style={{ fontSize: '9px', color: t.label, letterSpacing: '0.08em' }}>FINAL FANTASY XIV © SQUARE ENIX</div>
+          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: ac, textTransform: 'uppercase' }}>CC Player Card</div>
+          <div style={{ fontSize: '9px', color: t.label, marginTop: '1px', letterSpacing: '0.05em' }}>FINAL FANTASY XIV © SQUARE ENIX</div>
         </div>
       </div>
     </div>
@@ -556,8 +557,27 @@ function CardView({ player, theme, onEdit }) {
     }
   }, [player])
 
-  // マウント時に自動生成開始
-  React.useEffect(() => { handleRenderCard() }, [])
+  // スクショ画像が読み込まれてから生成開始
+  const [imgReady, setImgReady] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!player.screenshotDataUrl) {
+      // 画像なしの場合はすぐ開始
+      setImgReady(true)
+      return
+    }
+    // dataURLの場合は事前にImageオブジェクトで読み込み確認
+    const img = new Image()
+    img.onload = () => setImgReady(true)
+    img.onerror = () => setImgReady(true)
+    img.src = player.screenshotDataUrl
+  }, [player.screenshotDataUrl])
+
+  React.useEffect(() => {
+    if (!imgReady) return
+    const timer = setTimeout(() => { handleRenderCard() }, 200)
+    return () => clearTimeout(timer)
+  }, [imgReady])
 
   // ファイル名生成 cc-card-FirstLast-dark/white
   const getFileName = () => {
