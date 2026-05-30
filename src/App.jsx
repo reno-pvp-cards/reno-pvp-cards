@@ -540,34 +540,49 @@ function CardView({ player, theme, onEdit }) {
     if (!cardRef.current) return
     setGenerating(true)
     setCardImgSrc(null)
+
+    // rAFをN回待つユーティリティ
+    const waitFrames = (n = 2) => new Promise(resolve => {
+      let count = 0
+      const tick = () => { if (++count >= n) resolve(); else requestAnimationFrame(tick) }
+      requestAnimationFrame(tick)
+    })
+
     try {
       await document.fonts.ready
       const { default: domtoimage } = await import('dom-to-image-more')
       const imgEl = cardRef.current.querySelector('img[data-screenshot]')
 
       if (imgEl && player.screenshotDataUrl) {
-        // iOSキャッシュ対策：先にImageオブジェクトで読み込んでキャッシュさせる
+        // ① オフスクリーンImageで確実にデコード完了させる
         await new Promise(resolve => {
           const cacheImg = new Image()
-          cacheImg.onload = resolve
+          cacheImg.onload = async () => {
+            try { await cacheImg.decode() } catch(e) {}
+            resolve()
+          }
           cacheImg.onerror = resolve
           cacheImg.src = player.screenshotDataUrl
-          setTimeout(resolve, 3000)
         })
-        // DOM上の画像の描画完了を待つ
-        await new Promise(resolve => {
-          const check = () => {
-            if (imgEl.complete && imgEl.naturalWidth > 0) resolve()
-            else requestAnimationFrame(check)
-          }
-          check()
-          setTimeout(resolve, 3000)
-        })
+
+        // ② DOM上の<img>のdecodeも待つ
         try { await imgEl.decode() } catch(e) {}
+
+        // ③ iOSコンポジットレイヤーへの描画を待つ（2フレーム）
+        await waitFrames(2)
       }
 
-      // レンダリング安定待ち
-      await new Promise(r => setTimeout(r, 500))
+      // ④ レンダリング安定待ち
+      await new Promise(r => setTimeout(r, 300))
+
+      // ⑤ iOSウォームアップ：1回空キャプチャしてGPUキャッシュを確定させる
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+      if (isIOS && player.screenshotDataUrl) {
+        try { await domtoimage.toPng(cardRef.current, { scale: 1, cacheBust: true }) } catch(e) {}
+        await waitFrames(2)
+      }
+
+      // ⑥ 本番キャプチャ
       const dataUrl = await domtoimage.toPng(cardRef.current, { scale: 2, cacheBust: true })
       setCardImgSrc(dataUrl)
       setShowSave(true)
