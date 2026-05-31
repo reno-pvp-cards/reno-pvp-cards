@@ -467,10 +467,13 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
               background: t.accentColor + '12', border: `1px solid ${t.accentColor}40`,
               borderRadius: '8px', padding: '8px 12px', marginBottom: '8px',
               fontSize: '12px', color: t.value, fontFamily: "'Noto Sans JP',sans-serif",
-              display: 'flex', alignItems: 'center', gap: '8px',
+              display: 'flex', alignItems: 'flex-start', gap: '8px',
             }}>
-              <span>📐</span>
-              <span>推奨サイズ：横幅1280px以上・横長（4:3〜16:9）・JPG / PNG</span>
+              <span style={{ flexShrink: 0 }}>📐</span>
+              <span style={{ lineHeight: 1.6 }}>
+                推奨サイズ：<span style={{ whiteSpace: 'nowrap' }}>横幅1280px以上</span>・<span style={{ whiteSpace: 'nowrap' }}>横長（4:3〜16:9）</span><br />
+                形式：<span style={{ whiteSpace: 'nowrap' }}>JPG / PNG</span>
+              </span>
             </div>
             {form.screenshotDataUrl ? (
               <div>
