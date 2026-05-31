@@ -663,10 +663,13 @@ function CardView({ player, theme, onEdit }) {
       }
 
       // フェードオーバーレイ（DOM: height100, to-top, cardBg→cardBgcc(30%)→transparent）
+      // ※ canvas で 'transparent' を終点に使うと「透明な黒(rgba(0,0,0,0))」へ補間され、
+      //   中間色に黒が混ざる。ライトモードでは白→黒のにじみになるため、
+      //   終点を「cardBg と同色でアルファ0(=末尾'00')」にして黒混入を防ぐ。
       const fadeGrad = ctx.createLinearGradient(0, SS_H, 0, SS_H - 100)
       fadeGrad.addColorStop(0, t.cardBg)
       fadeGrad.addColorStop(0.3, t.cardBg + 'cc')
-      fadeGrad.addColorStop(1, 'transparent')
+      fadeGrad.addColorStop(1, t.cardBg + '00')
       fillRect(0, SS_H - 100, W, 100, fadeGrad)
 
       // プレイヤー名（DOM: bottom12px, left18px）
@@ -690,8 +693,9 @@ function CardView({ player, theme, onEdit }) {
       }
 
       // トップアクセントライン
+      // ※ 両端の 'transparent'(=透明な黒) を ac 同色の透明(末尾'00')にして黒混入を防ぐ
       const lineGrad = ctx.createLinearGradient(0, 0, W, 0)
-      lineGrad.addColorStop(0, 'transparent'); lineGrad.addColorStop(0.5, ac); lineGrad.addColorStop(1, 'transparent')
+      lineGrad.addColorStop(0, ac + '00'); lineGrad.addColorStop(0.5, ac); lineGrad.addColorStop(1, ac + '00')
       fillRect(0, 0, W, 2, lineGrad)
 
       // ── 情報エリア (300〜800px / padding 8px 16px 10px) ──
