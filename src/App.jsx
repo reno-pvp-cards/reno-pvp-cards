@@ -855,23 +855,27 @@ function CardView({ player, theme, onEdit }) {
           color: t.label,
         }}>
           不具合・ご要望は{' '}
-          <a href="https://x.com/reno_ff14pvp" target="_blank" rel="noopener noreferrer"
-            style={{ color: t.accentColor, textDecoration: 'none', fontWeight: 600 }}>
-            @reno_ff14pvp
-          </a>
-          {' '}までDMでお知らせください 🙏
+          <span style={{ whiteSpace: 'nowrap' }}>
+            <a href="https://x.com/reno_ff14pvp" target="_blank" rel="noopener noreferrer"
+              style={{ color: t.accentColor, textDecoration: 'none', fontWeight: 600 }}>
+              @reno_ff14pvp
+            </a>
+            {' '}までDMでお知らせください 🙏
+          </span>
         </div>
         <div style={{
           width: `${CARD_W}px`, maxWidth: '100%', marginTop: '8px',
           textAlign: 'center', fontFamily: "'Noto Sans JP',sans-serif", fontSize: '11px',
           color: t.label, lineHeight: 1.7,
         }}>
-          このアプリを気に入っていただけたら{' '}
-          <a href="https://ofuse.me/renopvpstudio" target="_blank" rel="noopener noreferrer"
-            style={{ color: t.accentColor, textDecoration: 'none', fontWeight: 600 }}>
-            OFUSE
-          </a>
-          {' '}で応援いただけると嬉しいです ☕️
+          <div>このアプリを気に入っていただけたら</div>
+          <div style={{ whiteSpace: 'nowrap' }}>
+            <a href="https://ofuse.me/renopvpstudio" target="_blank" rel="noopener noreferrer"
+              style={{ color: t.accentColor, textDecoration: 'none', fontWeight: 600 }}>
+              OFUSE
+            </a>
+            {' '}で応援いただけると嬉しいです ☕️
+          </div>
         </div>
       </div>
     )
