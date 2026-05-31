@@ -234,7 +234,7 @@ function PlayerCard({ player, theme, cardRef }) {
   }
   const activeTag   = { ...tagBase, background: ac + '22', borderColor: ac + '88', color: ac }
   const inactiveTag = { ...tagBase, background: t.inactiveTagBg, borderColor: t.inactiveTagBorder, color: t.inactiveTagText }
-  const mainTag     = { ...tagBase, background: ac + '33', borderColor: ac + '88', color: ac, fontWeight: 700 }
+  const mainTag     = { ...tagBase, background: ac + '55', borderColor: ac, color: theme === 'dark' ? '#fff' : ac, fontWeight: 700 }
 
   return (
     <div ref={cardRef} style={{
@@ -608,7 +608,7 @@ function CardView({ player, theme, onEdit }) {
           const tw = Math.max(ctx.measureText(label).width + hpad * 2, TAG_MINW)
           if (tx + tw > W - 16) { tx = 16; ty += TAG_PITCH }
           let bg, border, fg
-          if (type === 'main')     { bg = ac + '33'; border = ac + '88'; fg = ac }
+          if (type === 'main')     { bg = ac + '55'; border = ac; fg = theme === 'dark' ? '#ffffff' : ac }
           else if (type === 'sub') { bg = ac + '22';       border = ac + '88'; fg = ac }
           else                     { bg = t.inactiveTagBg; border = t.inactiveTagBorder; fg = t.inactiveTagText }
           roundRect(tx, ty, tw, TAG_H, TAG_H / 2, bg, border)
@@ -848,6 +848,18 @@ function CardView({ player, theme, onEdit }) {
           💾 ダウンロードボタン または
           📱 スマホ：長押し →「写真に追加」／
           💻 PC：右クリック →「名前を付けて保存」
+        </div>
+        <div style={{
+          width: `${CARD_W}px`, maxWidth: '100%', marginTop: '10px',
+          textAlign: 'center', fontFamily: "'Noto Sans JP',sans-serif", fontSize: '11px',
+          color: t.label,
+        }}>
+          不具合・ご要望は{' '}
+          <a href="https://x.com/reno_ff14pvp" target="_blank" rel="noopener noreferrer"
+            style={{ color: t.accentColor, textDecoration: 'none', fontWeight: 600 }}>
+            @reno_ff14pvp
+          </a>
+          {' '}までDMでお知らせください 🙏
         </div>
       </div>
     )
