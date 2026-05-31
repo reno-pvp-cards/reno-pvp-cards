@@ -269,10 +269,10 @@ function PlayerCard({ player, theme, cardRef }) {
         }} />
         <div style={{ position: 'absolute', bottom: '12px', left: '18px', right: '20px', textAlign: 'left' }}>
           <div style={{ fontSize: '10px', letterSpacing: '0.2em', color: t.accentColor, fontWeight: 500, marginBottom: '1px', textTransform: 'uppercase', fontFamily: "'Barlow Condensed',sans-serif" }}>Crystal Conflict Player</div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: t.playerNameColor, lineHeight: 1.0, fontFamily: "'Barlow Condensed','Rajdhani',sans-serif" }}>
+          <div style={{ fontSize: '28px', fontWeight: 700, color: t.playerNameColor, lineHeight: 1.0, fontFamily: "'Barlow Condensed','Rajdhani',sans-serif", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {player.firstName || 'First'} {player.lastName || 'Last'}
           </div>
-          {player.nickname && <div style={{ fontSize: '13px', color: t.value, marginTop: '1px', fontFamily: "'Noto Sans JP',sans-serif" }}>{player.nickname}</div>}
+          {player.nickname && <div style={{ fontSize: '13px', color: t.value, marginTop: '1px', fontFamily: "'Noto Sans JP',sans-serif", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{player.nickname}</div>}
         </div>
         {rank && (
           <div style={{
@@ -550,6 +550,7 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
 function CardView({ player, theme, onEdit }) {
   const t = THEME[theme]
   const cardRef = useRef()
+  const cardCanvasRef = useRef(null)
   const [generating, setGenerating] = useState(false)
   const [showSave, setShowSave] = useState(false)
   const [cardImgSrc, setCardImgSrc] = useState(null)
@@ -585,10 +586,16 @@ function CardView({ player, theme, onEdit }) {
         if (fill)  { ctx.fillStyle = fill; ctx.fill() }
         if (stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke() }
       }
-      const txt = (str, x, y, font, color, align = 'left', baseline = 'alphabetic') => {
+      const txt = (str, x, y, font, color, align = 'left', baseline = 'alphabetic', maxW = null) => {
         ctx.font = font; ctx.fillStyle = color
         ctx.textAlign = align; ctx.textBaseline = baseline
-        ctx.fillText(String(str), x, y)
+        let s = String(str)
+        if (maxW && ctx.measureText(s).width > maxW) {
+          // maxW に収まるまで末尾を削り「…」を付ける
+          while (s.length > 1 && ctx.measureText(s + '…').width > maxW) s = s.slice(0, -1)
+          s = s + '…'
+        }
+        ctx.fillText(s, x, y)
       }
       const loadImg = (src) => new Promise((res, rej) => {
         const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src
@@ -651,10 +658,12 @@ function CardView({ player, theme, onEdit }) {
       // プレイヤー名（DOM: bottom12px, left18px）
       ctx.textBaseline = 'alphabetic'
       const nameBottom = SS_H - 12
+      // 名前・呼び方の右限界（ランクバッジがある場合はその左まで）
+      const nameMaxW = (player.highestRank ? W - 84 - 8 : W - 18) - 18
       txt('CRYSTAL CONFLICT PLAYER', 18, nameBottom - 30, '500 10px "Barlow Condensed"', ac)
       const fullName = ((player.firstName || 'First') + ' ' + (player.lastName || 'Last')).trim()
-      txt(fullName, 18, nameBottom, '700 28px "Barlow Condensed"', t.playerNameColor)
-      if (player.nickname) txt(player.nickname, 18, nameBottom + 14, '13px "Noto Sans JP"', t.value)
+      txt(fullName, 18, nameBottom, '700 28px "Barlow Condensed"', t.playerNameColor, 'left', 'alphabetic', nameMaxW)
+      if (player.nickname) txt(player.nickname, 18, nameBottom + 14, '13px "Noto Sans JP"', t.value, 'left', 'alphabetic', nameMaxW)
 
       // ランクバッジ（DOM: top14, right14, padding 6px10px, minWidth56）
       const rank = player.highestRank
@@ -730,7 +739,8 @@ function CardView({ player, theme, onEdit }) {
           fs -= 0.5
           ctx.font = `600 ${fs}px "Noto Sans JP"`
         }
-        txt(str, x, y, `600 ${fs}px "Noto Sans JP"`, t.value)
+        // 最小フォントでも収まらない場合は末尾を省略（DOMの ellipsis に合わせる）
+        txt(str, x, y, `600 ${fs}px "Noto Sans JP"`, t.value, 'left', 'alphabetic', colInnerW)
       }
       const drawSectionLabel = (label) => {
         ctx.textBaseline = 'alphabetic'
@@ -788,6 +798,7 @@ function CardView({ player, theme, onEdit }) {
 
       const dataUrl = cv.toDataURL('image/png')
       setCardImgSrc(dataUrl)
+      cardCanvasRef.current = cv
       setShowSave(true)
     } catch (err) {
       console.error('render error:', err)
@@ -799,19 +810,30 @@ function CardView({ player, theme, onEdit }) {
 
   // 自動生成なし：ユーザーがボタンを押したときのみ生成
 
-  // ファイル名生成 cc-card-FirstLast-dark/white
+  // ファイル名生成 cc-card-FirstLast-dark/light
   const getFileName = () => {
-    const name = [player.firstName, player.lastName].filter(Boolean).join('') || 'player'
-    const mode = theme === 'dark' ? 'dark' : 'white'
+    const raw = [player.firstName, player.lastName].filter(Boolean).join('') || 'player'
+    // ファイル名に使えない文字を除去し、長すぎる名前は切り詰める
+    const name = raw.replace(/[\\/:*?"<>|\s]/g, '').slice(0, 40) || 'player'
+    const mode = theme === 'dark' ? 'dark' : 'light'
     return `cc-card-${name}-${mode}.png`
   }
 
   const handleDownload = () => {
-    if (!cardImgSrc) return
-    const a = document.createElement('a')
-    a.href = cardImgSrc
-    a.download = getFileName()
-    a.click()
+    const cv = cardCanvasRef.current
+    if (!cv) return
+    // data URL ではなく Blob URL を使うと download 属性のファイル名が確実に反映される
+    cv.toBlob((blob) => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = getFileName()
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }, 'image/png')
   }
 
   if (showSave && cardImgSrc) {
