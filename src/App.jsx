@@ -224,7 +224,7 @@ function SectionLabel({ children, theme }) {
 
 function PlayerCard({ player, theme, cardRef }) {
   const t = THEME[theme]
-  const rank = player.highestRank
+  const rank = player.highestRank === '__none__' ? '' : player.highestRank
   const rankCfg = RANK_CONFIG[rank]
   const ac = t.accentColor
 
@@ -383,7 +383,10 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
   const jobOptions = Object.entries(JOB_LIST).map(([role, jobs]) => ({
     label: role, items: jobs.map(j => ({ label: j, value: j }))
   }))
-  const rankOptions = RANK_LIST.map(r => ({ label: `${RANK_CONFIG[r].icon} ${r}`, value: r }))
+  const rankOptions = [
+    ...RANK_LIST.map(r => ({ label: `${RANK_CONFIG[r].icon} ${r}`, value: r })),
+    { label: '🚫 ランク非表示', value: '__none__' },
+  ]
 
   return (
     <div style={{ minHeight: '100vh', background: t.pageBg, padding: '24px 16px 40px', color: t.value }}>
@@ -427,7 +430,7 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
           {/* 最高ランク */}
           <div>
             <SectionLabel theme={theme}>最高ランク</SectionLabel>
-            <CustomSelect value={form.highestRank} onChange={v => set('highestRank', v)} options={rankOptions} placeholder="選択" theme={theme} />
+            <CustomSelect value={form.highestRank} onChange={v => set('highestRank', v)} options={rankOptions} placeholder="選択してください" theme={theme} />
           </div>
 
           {/* メインジョブ */}
@@ -570,6 +573,15 @@ function CardView({ player, theme, onEdit }) {
   const [showSave, setShowSave] = useState(false)
   const [cardImgSrc, setCardImgSrc] = useState(null)
 
+  // X（旧Twitter）へのポスト：投稿文を入れた状態でintentを開く
+  const handlePostToX = useCallback(() => {
+    const name = ((player.firstName || '') + ' ' + (player.lastName || '')).trim()
+    const nameLine = name ? `${name}のCCキャラカードを作りました！\n` : 'CCキャラカードを作りました！\n'
+    const text = `${nameLine}\n#FF14 #CCキャラカード\nhttps://reno-pvp-cards.vercel.app`
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }, [player])
+
   const handleRenderCard = useCallback(async () => {
     setGenerating(true)
     setCardImgSrc(null)
@@ -675,9 +687,11 @@ function CardView({ player, theme, onEdit }) {
       // プレイヤー名（DOM: bottom12px, left18px）
       ctx.textBaseline = 'alphabetic'
       const nameBottom = SS_H - 12
+      // 「ランク非表示」(__none__) や未選択はバッジを出さない
+      const rank = player.highestRank === '__none__' ? '' : player.highestRank
       // 名前・呼び方の右限界（ランクバッジがある場合はその左まで）
       const nameLeft = 18
-      const nameRightLimit = player.highestRank ? W - 84 - 8 : W - 18
+      const nameRightLimit = rank ? W - 84 - 8 : W - 18
       const nameMaxW = nameRightLimit - nameLeft
       txt('CRYSTAL CONFLICT PLAYER', nameLeft, nameBottom - 30, '500 10px "Barlow Condensed"', ac)
       const fullName = ((player.firstName || 'First') + ' ' + (player.lastName || 'Last')).trim()
@@ -685,7 +699,6 @@ function CardView({ player, theme, onEdit }) {
       if (player.nickname) txt(player.nickname, nameLeft, nameBottom + 14, '13px "Noto Sans JP"', t.value, 'left', 'alphabetic', nameMaxW)
 
       // ランクバッジ（DOM: top14, right14, padding 6px10px, minWidth56）
-      const rank = player.highestRank
       if (rank) {
         roundRect(W - 84, 14, 70, 56, 10, t.rankBadgeBg, ac + '66')
         txt(RANK_CONFIG[rank]?.icon || '', W - 49, 24, '22px serif', '#fff', 'center', 'top')
@@ -852,6 +865,7 @@ function CardView({ player, theme, onEdit }) {
             💻 PC：右クリック →「名前を付けて保存」
           </span>
         </div>
+
         <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap', justifyContent: 'center' }}>
           <button onClick={() => { setShowSave(false); setCardImgSrc(null) }} style={{
             padding: '7px 14px', background: t.inactiveTagBg, border: `1px solid ${t.inactiveTagBorder}`,
@@ -864,6 +878,25 @@ function CardView({ player, theme, onEdit }) {
             cursor: generating ? 'wait' : 'pointer', fontFamily: "'Noto Sans JP',sans-serif",
             opacity: generating ? 0.7 : 1,
           }}>{generating ? '生成中...' : '↺ 再生成'}</button>
+        </div>
+
+        {/* Xでポスト（控えめ） */}
+        <button onClick={handlePostToX} style={{
+          marginTop: '14px', padding: '8px 18px',
+          background: 'transparent', border: `1px solid ${t.inactiveTagBorder}`,
+          borderRadius: '20px', color: t.value, cursor: 'pointer',
+          fontFamily: "'Noto Sans JP',sans-serif", fontSize: '13px', fontWeight: 500,
+          display: 'inline-flex', alignItems: 'center', gap: '7px',
+          transition: 'all 0.15s ease',
+        }}>
+          <span style={{ fontSize: '14px', fontWeight: 900 }}>𝕏</span>
+          ポストする
+        </button>
+        <div style={{
+          marginTop: '5px', textAlign: 'center',
+          fontFamily: "'Noto Sans JP',sans-serif", fontSize: '11px', color: t.label,
+        }}>
+          ※投稿画面で保存した画像を添付してください
         </div>
         <div style={{
           width: `${CARD_W}px`, maxWidth: '100%', marginTop: '10px',
