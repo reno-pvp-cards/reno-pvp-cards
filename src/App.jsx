@@ -893,8 +893,9 @@ function CardView({ player, theme, onEdit }) {
           ポストする
         </button>
         <div style={{
-          marginTop: '5px', textAlign: 'center',
-          fontFamily: "'Noto Sans JP',sans-serif", fontSize: '11px', color: t.label,
+          marginTop: '7px', textAlign: 'center',
+          fontFamily: "'Noto Sans JP',sans-serif", fontSize: '11px', fontWeight: 500,
+          color: t.value, opacity: 0.7,
         }}>
           ※投稿画面で保存した画像を添付してください
         </div>
