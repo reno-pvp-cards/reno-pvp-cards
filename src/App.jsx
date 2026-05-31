@@ -194,7 +194,7 @@ function CustomSelect({ value, onChange, options, placeholder, theme }) {
             </div>
           ) : (
             <div key={gi} onClick={() => { onChange(g.value); setOpen(false) }}
-              style={{ padding: '9px 14px', fontSize: '14px', fontFamily: "'Noto Sans JP',sans-serif", cursor: 'pointer', background: g.value === value ? t.selectActive : 'transparent', color: g.value === value ? t.accentColor : t.selectText, textAlign: 'left' }}
+              style={{ padding: '9px 14px', fontSize: '13px', fontFamily: "'Noto Sans JP',sans-serif", cursor: 'pointer', background: g.value === value ? t.selectActive : 'transparent', color: g.value === value ? t.accentColor : t.selectText, textAlign: 'left' }}
               onMouseEnter={e => { if (g.value !== value) e.currentTarget.style.background = t.selectHover }}
               onMouseLeave={e => { if (g.value !== value) e.currentTarget.style.background = 'transparent' }}
             >{g.value === value ? '✓ ' : ''}{g.label}</div>
@@ -860,6 +860,18 @@ function CardView({ player, theme, onEdit }) {
             @reno_ff14pvp
           </a>
           {' '}までDMでお知らせください 🙏
+        </div>
+        <div style={{
+          width: `${CARD_W}px`, maxWidth: '100%', marginTop: '8px',
+          textAlign: 'center', fontFamily: "'Noto Sans JP',sans-serif", fontSize: '11px',
+          color: t.label, lineHeight: 1.7,
+        }}>
+          このアプリを気に入っていただけたら{' '}
+          <a href="https://ofuse.me/renopvpstudio" target="_blank" rel="noopener noreferrer"
+            style={{ color: t.accentColor, textDecoration: 'none', fontWeight: 600 }}>
+            OFUSE
+          </a>
+          {' '}で応援いただけると嬉しいです ☕️
         </div>
       </div>
     )
