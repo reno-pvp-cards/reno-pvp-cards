@@ -258,7 +258,7 @@ function PlayerCard({ player, theme, cardRef }) {
             width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: theme === 'dark'
               ? 'linear-gradient(135deg,#0d0d30,#1a0a2e,#0a1520)'
-              : 'linear-gradient(135deg,#f0e8f0,#e8d8e8,#d8e8f0)',
+              : 'linear-gradient(135deg,#f5e3ee,#eddfe8,#f2eeec)',
           }}>
             <span style={{ color: t.label, fontSize: '13px', letterSpacing: '0.1em' }}>NO IMAGE</span>
           </div>
@@ -317,7 +317,7 @@ function PlayerCard({ player, theme, cardRef }) {
           <div style={{
             background: t.noteBg, border: `1px solid ${t.noteBorder}`, borderRadius: '8px',
             padding: '6px 10px', fontSize: '11px', color: player.freeText ? t.value : t.label,
-            fontFamily: "'Noto Sans JP',sans-serif", lineHeight: 1.55, height: '52px', overflow: 'hidden', textAlign: 'left',
+            fontFamily: "'Noto Sans JP',sans-serif", lineHeight: 1.5, height: '58px', overflow: 'hidden', textAlign: 'left',
           }}>{player.freeText || ''}</div>
         </div>
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -643,7 +643,7 @@ function CardView({ player, theme, onEdit }) {
       } else {
         const grad = ctx.createLinearGradient(0, 0, W, SS_H)
         if (theme === 'dark') { grad.addColorStop(0,'#0d0d30'); grad.addColorStop(0.5,'#1a0a2e'); grad.addColorStop(1,'#0a1520') }
-        else                  { grad.addColorStop(0,'#f0e8f0'); grad.addColorStop(0.5,'#e8d8e8'); grad.addColorStop(1,'#d8e8f0') }
+        else                  { grad.addColorStop(0,'#f5e3ee'); grad.addColorStop(0.5,'#eddfe8'); grad.addColorStop(1,'#f2eeec') }
         fillRect(0, 0, W, SS_H, grad)
         txt('NO IMAGE', W / 2, SS_H / 2, '13px "Noto Sans JP"', t.label, 'center', 'middle')
       }
@@ -683,7 +683,7 @@ function CardView({ player, theme, onEdit }) {
       const INFO_TOP = SS_H + 8           // padding-top 8px
       const INFO_BOTTOM = H - 10          // padding-bottom 10px
       const LABEL_H = 13 + 2              // セクションラベル高さ+marginBottom
-      const stH = 46, noteH = 52
+      const stH = 46, noteH = 58
 
       // タグ行数から高さを計測するヘルパー（描画せず高さのみ）
       const measureTagsH = (tags) => {
@@ -781,7 +781,7 @@ function CardView({ player, theme, onEdit }) {
           else line += ch
         }
         lines.push(line)
-        lines.slice(0, 3).forEach((l, i) => ctx.fillText(l, 26, cy + 16 + i * 17))
+        lines.slice(0, 3).forEach((l, i) => ctx.fillText(l, 26, cy + 17 + i * 16))
       }
       cy += noteH + gap
 
