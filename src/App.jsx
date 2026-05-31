@@ -143,8 +143,14 @@ function CustomSelect({ value, onChange, options, placeholder, theme }) {
 
   React.useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    if (open) document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    if (open) {
+      document.addEventListener('mousedown', handler)
+      document.addEventListener('touchstart', handler)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('touchstart', handler)
+    }
   }, [open])
 
   const selectedLabel = (() => {
@@ -248,20 +254,13 @@ function PlayerCard({ player, theme, cardRef }) {
         backgroundSize: '200% auto', animation: 'shimmer 3s linear infinite',
       }} />
 
-      {/* スクショ */}
+      {/* スクショ（画像は必須。未設定時は背景色のみのフォールバック） */}
       <div style={{ position: 'relative', height: `${SS_HEIGHT}px`, overflow: 'hidden' }}>
         {player.screenshotDataUrl ? (
           <img data-screenshot src={player.screenshotDataUrl} alt="ss"
             style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
         ) : (
-          <div style={{
-            width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: theme === 'dark'
-              ? 'linear-gradient(135deg,#0d0d30,#1a0a2e,#0a1520)'
-              : 'linear-gradient(135deg,#f5e3ee,#eddfe8,#f2eeec)',
-          }}>
-            <span style={{ color: t.label, fontSize: '13px', letterSpacing: '0.1em' }}>NO IMAGE</span>
-          </div>
+          <div style={{ width: '100%', height: '100%', background: t.cardBg }} />
         )}
         <div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0, height: '100px', pointerEvents: 'none',
@@ -463,7 +462,7 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
 
           {/* スクショ */}
           <div>
-            <SectionLabel theme={theme}>スクリーンショット画像</SectionLabel>
+            <SectionLabel theme={theme}>スクリーンショット画像（必須）</SectionLabel>
             <div style={{
               background: t.accentColor + '12', border: `1px solid ${t.accentColor}40`,
               borderRadius: '8px', padding: '8px 12px', marginBottom: '8px',
@@ -471,7 +470,7 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
               display: 'flex', alignItems: 'center', gap: '8px',
             }}>
               <span>📐</span>
-              <span>推奨サイズ：横幅 1280px 以上・縦横比 4:3 〜 16:9 推奨</span>
+              <span>推奨サイズ：横幅1280px以上・横長（4:3〜16:9）・JPG / PNG</span>
             </div>
             {form.screenshotDataUrl ? (
               <div>
@@ -505,8 +504,7 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
               }}>
                 <span style={{ fontSize: '32px' }}>🖼️</span>
                 <span style={{ fontSize: '14px', fontWeight: 600, color: t.value, fontFamily: "'Noto Sans JP',sans-serif" }}>クリックしてスクショを選択</span>
-                <span style={{ fontSize: '12px', color: t.label, fontFamily: "'Noto Sans JP',sans-serif" }}>JPG / PNG　推奨：1280px幅以上の横長画像</span>
-                <span style={{ fontSize: '11px', color: t.accentColor, fontFamily: "'Noto Sans JP',sans-serif", lineHeight: 1.5 }}>横向きのスクショを入れると映えます ✨<br />（画像なしでも生成できます）</span>
+                <span style={{ fontSize: '11px', color: t.accentColor, fontFamily: "'Noto Sans JP',sans-serif", lineHeight: 1.5 }}>横向きのスクショを入れると映えます ✨</span>
               </div>
             )}
             <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
@@ -534,11 +532,23 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
             </div>
           </div>
 
-          <button onClick={() => onSubmit(form)} style={{
-            width: '100%', padding: '14px', background: t.buttonBg, color: t.buttonText,
-            border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: 700,
-            fontFamily: "'Rajdhani',sans-serif", letterSpacing: '0.08em', cursor: 'pointer', marginTop: '4px',
+          <button
+            onClick={() => { if (form.screenshotDataUrl) onSubmit(form) }}
+            disabled={!form.screenshotDataUrl}
+            style={{
+            width: '100%', padding: '14px',
+            background: form.screenshotDataUrl ? t.buttonBg : t.inactiveTagBg,
+            color: form.screenshotDataUrl ? t.buttonText : t.label,
+            border: form.screenshotDataUrl ? 'none' : `1px solid ${t.inactiveTagBorder}`,
+            borderRadius: '10px', fontSize: '16px', fontWeight: 700,
+            fontFamily: "'Rajdhani',sans-serif", letterSpacing: '0.08em',
+            cursor: form.screenshotDataUrl ? 'pointer' : 'not-allowed', marginTop: '4px',
           }}>カードを表示 →</button>
+          {!form.screenshotDataUrl && (
+            <div style={{ textAlign: 'center', fontSize: '11px', color: t.accentColor, fontFamily: "'Noto Sans JP',sans-serif", paddingTop: '6px' }}>
+              スクリーンショット画像を選択するとカードを表示できます
+            </div>
+          )}
           <div style={{ textAlign: 'center', fontSize: '11px', color: t.label, paddingTop: '4px' }}>
             FINAL FANTASY XIV © SQUARE ENIX
           </div>
@@ -574,7 +584,8 @@ function CardView({ player, theme, onEdit }) {
       const ac = t.accentColor
 
       // ── ヘルパー ──────────────────────────────────────
-      const fillRect = (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(x, y, w, h) }
+      // fill には色文字列・CanvasGradient どちらも渡せる
+      const fillRect = (x, y, w, h, fill) => { ctx.fillStyle = fill; ctx.fillRect(x, y, w, h) }
       const roundRect = (x, y, w, h, r, fill, stroke) => {
         ctx.beginPath()
         ctx.moveTo(x + r, y)
@@ -631,6 +642,8 @@ function CardView({ player, theme, onEdit }) {
       fillRect(0, 0, W, H, t.cardBg)
 
       // ── スクショエリア ────────────────────────────────
+      // 画像は必須（送信時にバリデート済み）。万一未設定でもクラッシュしないよう
+      // カード背景で塗りつぶすだけのフォールバックを置く。
       if (player.screenshotDataUrl) {
         const img = await loadImg(player.screenshotDataUrl)
         const srcR = img.width / img.height, tgtR = W / SS_H
@@ -641,11 +654,7 @@ function CardView({ player, theme, onEdit }) {
         // ※縦長画像（else分岐）は sy=0（上端固定）で DOM の center-top と一致
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, SS_H)
       } else {
-        const grad = ctx.createLinearGradient(0, 0, W, SS_H)
-        if (theme === 'dark') { grad.addColorStop(0,'#0d0d30'); grad.addColorStop(0.5,'#1a0a2e'); grad.addColorStop(1,'#0a1520') }
-        else                  { grad.addColorStop(0,'#f5e3ee'); grad.addColorStop(0.5,'#eddfe8'); grad.addColorStop(1,'#f2eeec') }
-        fillRect(0, 0, W, SS_H, grad)
-        txt('NO IMAGE', W / 2, SS_H / 2, '13px "Noto Sans JP"', t.label, 'center', 'middle')
+        fillRect(0, 0, W, SS_H, t.cardBg)
       }
 
       // フェードオーバーレイ（DOM: height100, to-top, cardBg→cardBgcc(30%)→transparent）
@@ -659,11 +668,13 @@ function CardView({ player, theme, onEdit }) {
       ctx.textBaseline = 'alphabetic'
       const nameBottom = SS_H - 12
       // 名前・呼び方の右限界（ランクバッジがある場合はその左まで）
-      const nameMaxW = (player.highestRank ? W - 84 - 8 : W - 18) - 18
-      txt('CRYSTAL CONFLICT PLAYER', 18, nameBottom - 30, '500 10px "Barlow Condensed"', ac)
+      const nameLeft = 18
+      const nameRightLimit = player.highestRank ? W - 84 - 8 : W - 18
+      const nameMaxW = nameRightLimit - nameLeft
+      txt('CRYSTAL CONFLICT PLAYER', nameLeft, nameBottom - 30, '500 10px "Barlow Condensed"', ac)
       const fullName = ((player.firstName || 'First') + ' ' + (player.lastName || 'Last')).trim()
-      txt(fullName, 18, nameBottom, '700 28px "Barlow Condensed"', t.playerNameColor, 'left', 'alphabetic', nameMaxW)
-      if (player.nickname) txt(player.nickname, 18, nameBottom + 14, '13px "Noto Sans JP"', t.value, 'left', 'alphabetic', nameMaxW)
+      txt(fullName, nameLeft, nameBottom, '700 28px "Barlow Condensed"', t.playerNameColor, 'left', 'alphabetic', nameMaxW)
+      if (player.nickname) txt(player.nickname, nameLeft, nameBottom + 14, '13px "Noto Sans JP"', t.value, 'left', 'alphabetic', nameMaxW)
 
       // ランクバッジ（DOM: top14, right14, padding 6px10px, minWidth56）
       const rank = player.highestRank
@@ -812,15 +823,6 @@ function CardView({ player, theme, onEdit }) {
   if (showSave && cardImgSrc) {
     return (
       <div style={{ minHeight: '100vh', background: t.pageBg, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px 40px' }}>
-        <div style={{
-          width: `${CARD_W}px`, maxWidth: '100%', marginBottom: '12px',
-          background: t.accentColor + '1a', border: `1px solid ${t.accentColor}55`,
-          borderRadius: '10px', padding: '10px 14px', textAlign: 'center',
-          color: t.accentColor, fontFamily: "'Noto Sans JP',sans-serif", fontSize: '14px', fontWeight: 700,
-          animation: 'fadeIn 0.4s ease',
-        }}>
-          ✅ カードが完成しました！
-        </div>
         <img src={cardImgSrc} alt="Generated card" style={{
           width: `${CARD_W}px`, maxWidth: '100%', display: 'block',
           borderRadius: '4px', border: `1px solid ${t.border}`, animation: 'fadeIn 0.4s ease',
@@ -828,12 +830,16 @@ function CardView({ player, theme, onEdit }) {
         <div style={{
           width: `${CARD_W}px`, maxWidth: '100%', marginTop: '12px',
           background: t.accentColor + '12', border: `1px solid ${t.accentColor}35`,
-          borderRadius: '8px', padding: '10px 14px', textAlign: 'center',
+          borderRadius: '8px', padding: '12px 14px', textAlign: 'center',
           color: t.value, fontFamily: "'Noto Sans JP',sans-serif", fontSize: '12px', fontWeight: 600, lineHeight: 1.8,
         }}>
+          <div style={{ color: t.accentColor, fontSize: '14px', fontWeight: 700, marginBottom: '6px' }}>
+            ✅ カードが完成しました！
+          </div>
           👆 上の画像を保存してください<br />
           <span style={{ fontSize: '11px', fontWeight: 400, color: t.label }}>
-            📱 スマホ：長押し →「写真に追加」／💻 PC：右クリック →「名前を付けて保存」
+            📱 スマホ：長押し →「写真に追加」<br />
+            💻 PC：右クリック →「名前を付けて保存」
           </span>
         </div>
         <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap', justifyContent: 'center' }}>
