@@ -505,7 +505,8 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
               }}>
                 <span style={{ fontSize: '32px' }}>🖼️</span>
                 <span style={{ fontSize: '14px', fontWeight: 600, color: t.value, fontFamily: "'Noto Sans JP',sans-serif" }}>クリックしてスクショを選択</span>
-                <span style={{ fontSize: '12px', color: t.label, fontFamily: "'Noto Sans JP',sans-serif" }}>JPG / PNG　推奨：1280px幅以上</span>
+                <span style={{ fontSize: '12px', color: t.label, fontFamily: "'Noto Sans JP',sans-serif" }}>JPG / PNG　推奨：1280px幅以上の横長画像</span>
+                <span style={{ fontSize: '11px', color: t.accentColor, fontFamily: "'Noto Sans JP',sans-serif", lineHeight: 1.5 }}>横向きのスクショを入れると映えます ✨<br />（画像なしでも生成できます）</span>
               </div>
             )}
             <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
@@ -550,7 +551,6 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
 function CardView({ player, theme, onEdit }) {
   const t = THEME[theme]
   const cardRef = useRef()
-  const cardCanvasRef = useRef(null)
   const [generating, setGenerating] = useState(false)
   const [showSave, setShowSave] = useState(false)
   const [cardImgSrc, setCardImgSrc] = useState(null)
@@ -798,7 +798,6 @@ function CardView({ player, theme, onEdit }) {
 
       const dataUrl = cv.toDataURL('image/png')
       setCardImgSrc(dataUrl)
-      cardCanvasRef.current = cv
       setShowSave(true)
     } catch (err) {
       console.error('render error:', err)
@@ -810,66 +809,45 @@ function CardView({ player, theme, onEdit }) {
 
   // 自動生成なし：ユーザーがボタンを押したときのみ生成
 
-  // ファイル名生成 cc-card-FirstLast-dark/light
-  const getFileName = () => {
-    const raw = [player.firstName, player.lastName].filter(Boolean).join('') || 'player'
-    // ファイル名に使えない文字を除去し、長すぎる名前は切り詰める
-    const name = raw.replace(/[\\/:*?"<>|\s]/g, '').slice(0, 40) || 'player'
-    const mode = theme === 'dark' ? 'dark' : 'light'
-    return `cc-card-${name}-${mode}.png`
-  }
-
-  const handleDownload = () => {
-    const cv = cardCanvasRef.current
-    if (!cv) return
-    // data URL ではなく Blob URL を使うと download 属性のファイル名が確実に反映される
-    cv.toBlob((blob) => {
-      if (!blob) return
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = getFileName()
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
-    }, 'image/png')
-  }
-
   if (showSave && cardImgSrc) {
     return (
       <div style={{ minHeight: '100vh', background: t.pageBg, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px 40px' }}>
+        <div style={{
+          width: `${CARD_W}px`, maxWidth: '100%', marginBottom: '12px',
+          background: t.accentColor + '1a', border: `1px solid ${t.accentColor}55`,
+          borderRadius: '10px', padding: '10px 14px', textAlign: 'center',
+          color: t.accentColor, fontFamily: "'Noto Sans JP',sans-serif", fontSize: '14px', fontWeight: 700,
+          animation: 'fadeIn 0.4s ease',
+        }}>
+          ✅ カードが完成しました！
+        </div>
         <img src={cardImgSrc} alt="Generated card" style={{
           width: `${CARD_W}px`, maxWidth: '100%', display: 'block',
           borderRadius: '4px', border: `1px solid ${t.border}`, animation: 'fadeIn 0.4s ease',
         }} />
+        <div style={{
+          width: `${CARD_W}px`, maxWidth: '100%', marginTop: '12px',
+          background: t.accentColor + '12', border: `1px solid ${t.accentColor}35`,
+          borderRadius: '8px', padding: '10px 14px', textAlign: 'center',
+          color: t.value, fontFamily: "'Noto Sans JP',sans-serif", fontSize: '12px', fontWeight: 600, lineHeight: 1.8,
+        }}>
+          👆 上の画像を保存してください<br />
+          <span style={{ fontSize: '11px', fontWeight: 400, color: t.label }}>
+            📱 スマホ：長押し →「写真に追加」／💻 PC：右クリック →「名前を付けて保存」
+          </span>
+        </div>
         <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap', justifyContent: 'center' }}>
           <button onClick={() => { setShowSave(false); setCardImgSrc(null) }} style={{
             padding: '7px 14px', background: t.inactiveTagBg, border: `1px solid ${t.inactiveTagBorder}`,
             borderRadius: '20px', color: t.value, fontSize: '12px', fontWeight: 500,
             cursor: 'pointer', fontFamily: "'Noto Sans JP',sans-serif",
           }}>← 戻る</button>
-          <button onClick={handleDownload} style={{
-            padding: '7px 16px', background: t.buttonBg, border: 'none', borderRadius: '20px',
-            color: t.buttonText, fontSize: '12px', fontWeight: 700,
-            cursor: 'pointer', fontFamily: "'Noto Sans JP',sans-serif",
-          }}>💾 ダウンロード</button>
           <button onClick={handleRenderCard} disabled={generating} style={{
             padding: '7px 14px', background: t.inactiveTagBg, border: `1px solid ${t.inactiveTagBorder}`,
             borderRadius: '20px', color: t.value, fontSize: '12px',
             cursor: generating ? 'wait' : 'pointer', fontFamily: "'Noto Sans JP',sans-serif",
             opacity: generating ? 0.7 : 1,
           }}>{generating ? '生成中...' : '↺ 再生成'}</button>
-        </div>
-        <div style={{
-          width: `${CARD_W}px`, maxWidth: '100%', marginTop: '12px',
-          background: t.accentColor + '12', border: `1px solid ${t.accentColor}35`,
-          borderRadius: '8px', padding: '8px 14px',
-          color: t.label, fontFamily: "'Noto Sans JP',sans-serif", fontSize: '11px', lineHeight: 1.8,
-        }}>
-          💾 ダウンロードボタン または
-          📱 スマホ：長押し →「写真に追加」／
-          💻 PC：右クリック →「名前を付けて保存」
         </div>
         <div style={{
           width: `${CARD_W}px`, maxWidth: '100%', marginTop: '10px',
