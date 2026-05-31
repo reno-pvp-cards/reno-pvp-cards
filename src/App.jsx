@@ -327,7 +327,9 @@ function PlayerCard({ player, theme, cardRef }) {
         </div>
         <div style={{ marginTop: '4px', borderTop: `1px solid ${t.border}`, paddingTop: '6px' }}>
           <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: ac, textTransform: 'uppercase' }}>CC Player Card</div>
-          <div style={{ fontSize: '9px', color: t.label, marginTop: '1px', letterSpacing: '0.05em' }}>FINAL FANTASY XIV © SQUARE ENIX</div>
+          <div style={{ fontSize: '9px', color: t.label, marginTop: '1px', letterSpacing: '0.05em', lineHeight: 1.5 }}>
+            FINAL FANTASY XIV<br />© SQUARE ENIX
+          </div>
         </div>
       </div>
     </div>
@@ -470,7 +472,7 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
               display: 'flex', alignItems: 'flex-start', gap: '8px',
             }}>
               <span style={{ flexShrink: 0 }}>📐</span>
-              <span style={{ lineHeight: 1.6 }}>
+              <span style={{ lineHeight: 1.6, textAlign: 'left', flex: 1 }}>
                 推奨サイズ：<span style={{ whiteSpace: 'nowrap' }}>横幅1280px以上</span>・<span style={{ whiteSpace: 'nowrap' }}>横長（4:3〜16:9）</span><br />
                 形式：<span style={{ whiteSpace: 'nowrap' }}>JPG / PNG</span>
               </span>
@@ -517,12 +519,12 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
           <div>
             <SectionLabel theme={theme}>NOTE（大会履歴・活動内容・一言など）</SectionLabel>
             <textarea
-              style={{ ...inputStyle, height: '110px', resize: 'none', lineHeight: 1.7 }}
+              style={{ ...inputStyle, height: '92px', resize: 'none', lineHeight: 1.7 }}
               value={form.freeText}
               onChange={e => set('freeText', e.target.value.slice(0, 120))}
               placeholder={'例）くりこん杯 3位\n週末メインでプレイ中\n気軽に絡んでください！'}
             />
-            <div style={{ textAlign: 'right', fontSize: '11px', color: t.label, marginTop: '4px' }}>{form.freeText.length} / 120</div>
+            <div style={{ textAlign: 'right', fontSize: '11px', color: t.label, marginTop: '2px' }}>{form.freeText.length} / 120</div>
           </div>
 
           {/* SNS */}
@@ -552,8 +554,8 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
               スクリーンショット画像を選択するとカードを表示できます
             </div>
           )}
-          <div style={{ textAlign: 'center', fontSize: '11px', color: t.label, paddingTop: '4px' }}>
-            FINAL FANTASY XIV © SQUARE ENIX
+          <div style={{ textAlign: 'center', fontSize: '11px', color: t.label, paddingTop: '4px', lineHeight: 1.6 }}>
+            FINAL FANTASY XIV<br />© SQUARE ENIX
           </div>
         </div>
       </div>
@@ -731,7 +733,7 @@ function CardView({ player, theme, onEdit }) {
       const psH   = LABEL_H + measureTagsH(psTags)
       const noteSecH = LABEL_H + noteH
       const snsH  = measureTagsH(snsTags)
-      const footerH = 1 + 6 + 11 + 12  // 線 + paddingTop6 + テキスト2行ぶん
+      const footerH = 1 + 6 + 11 + 12 + 11  // 線 + paddingTop6 + テキスト3行ぶん（CARD名 + FF14 + ©）
       const footerMarginTop = 4
 
       // セクションは6ブロック: SERVER/TEAM, JOBS, PLAY STYLE, NOTE, SNS, フッター
@@ -808,7 +810,8 @@ function CardView({ player, theme, onEdit }) {
       ctx.beginPath(); ctx.moveTo(16, cy); ctx.lineTo(W - 16, cy); ctx.stroke()
       cy += 6
       txt('CC PLAYER CARD', 16, cy + 11, '700 11px "Barlow Condensed"', ac)
-      txt('FINAL FANTASY XIV © SQUARE ENIX', 16, cy + 23, '9px "Barlow Condensed"', t.label)
+      txt('FINAL FANTASY XIV', 16, cy + 23, '9px "Barlow Condensed"', t.label)
+      txt('© SQUARE ENIX', 16, cy + 34, '9px "Barlow Condensed"', t.label)
 
       const dataUrl = cv.toDataURL('image/png')
       setCardImgSrc(dataUrl)
