@@ -875,20 +875,6 @@ function CardView({ player, theme, onEdit }) {
             {' '}までDMでお知らせください 🙏
           </span>
         </div>
-        <div style={{
-          width: `${CARD_W}px`, maxWidth: '100%', marginTop: '8px',
-          textAlign: 'center', fontFamily: "'Noto Sans JP',sans-serif", fontSize: '11px',
-          color: t.label, lineHeight: 1.7,
-        }}>
-          <div>このアプリを気に入っていただけたら</div>
-          <div style={{ whiteSpace: 'nowrap' }}>
-            <a href="https://ofuse.me/renopvpstudio" target="_blank" rel="noopener noreferrer"
-              style={{ color: t.accentColor, textDecoration: 'none', fontWeight: 600 }}>
-              OFUSE
-            </a>
-            {' '}で応援いただけると嬉しいです ☕️
-          </div>
-        </div>
       </div>
     )
   }
