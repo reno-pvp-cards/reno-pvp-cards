@@ -41,8 +41,9 @@ const CARD_SCALE = 2.5      // 出力 = 1080×1350
 const SS_HEIGHT = 180       // スクショエリア高さ（4:5・情報エリアにゆとり）
 
 
-const DARK_COLOR  = '#a8d8ea'
-const LIGHT_COLOR = '#e87db0'
+const DARK_COLOR   = '#a8d8ea'
+const LIGHT_COLOR  = '#e87db0'
+const SIMPLE_COLOR = '#4aa8d8'
 
 const THEME = {
   dark: {
@@ -89,6 +90,28 @@ const THEME = {
     themeBtnActiveText: '#2a2a3a', themeBtnInactiveText: 'rgba(0,0,0,0.35)',
     themeBtnBorder: 'rgba(0,0,0,0.12)',
   },
+  simple: {
+    cardBg: '#eceff2', pageBg: '#e1e6ea',
+    label: '#9aa4ac', value: '#22323e',
+    activeTag: SIMPLE_COLOR, activeTagMainText: '#ffffff',
+    inactiveTagBg: 'rgba(0,0,0,0.04)', inactiveTagBorder: 'rgba(0,0,0,0.12)',
+    inactiveTagText: 'rgba(0,0,0,0.38)',
+    border: 'rgba(0,0,0,0.1)', sectionBg: 'rgba(255,255,255,0.78)',
+    inputBg: 'rgba(255,255,255,0.92)', inputBorder: 'rgba(0,0,0,0.12)',
+    inputText: '#22323e', buttonBg: SIMPLE_COLOR, buttonText: '#ffffff',
+    accentColor: SIMPLE_COLOR,
+    rankBadgeBg: 'rgba(255,255,255,0.92)',
+    playerNameColor: '#112028',
+    noteBg: 'rgba(255,255,255,0.85)', noteBorder: 'rgba(0,0,0,0.1)',
+    selectBg: 'rgba(255,255,255,0.92)', selectBorder: 'rgba(0,0,0,0.12)',
+    selectText: '#22323e', selectHover: 'rgba(74,168,216,0.1)',
+    selectActive: 'rgba(74,168,216,0.18)', dropdownBg: '#f3fafe',
+    dropdownBorder: 'rgba(74,168,216,0.3)', groupLabel: 'rgba(50,130,180,0.6)',
+    deleteBg: 'rgba(220,50,50,0.07)', deleteBorder: 'rgba(220,50,50,0.25)', deleteText: '#cc4444',
+    themeBtnActiveBg: 'rgba(0,0,0,0.1)', themeBtnInactiveBg: 'transparent',
+    themeBtnActiveText: '#22323e', themeBtnInactiveText: 'rgba(0,0,0,0.35)',
+    themeBtnBorder: 'rgba(0,0,0,0.12)',
+  },
 }
 
 const GlobalStyle = () => (
@@ -122,10 +145,14 @@ function ThemeToggle({ theme, onToggle }) {
       display: 'flex', background: t.inactiveTagBg,
       border: `1px solid ${t.themeBtnBorder}`, borderRadius: '24px', padding: '3px', gap: '2px',
     }}>
-      {[{ key: 'dark', label: '🌙 ダーク' }, { key: 'light', label: '☁️ ライト' }].map(({ key, label }) => (
+      {[
+        { key: 'dark',   label: 'ダーク' },
+        { key: 'simple', label: 'シンプル' },
+        { key: 'light',  label: 'ライト' },
+      ].map(({ key, label }) => (
         <button key={key} onClick={() => onToggle(key)} style={{
-          padding: '5px 14px', borderRadius: '20px', border: 'none', cursor: 'pointer',
-          fontSize: '13px', fontFamily: "'Noto Sans JP',sans-serif",
+          padding: '5px 13px', borderRadius: '20px', border: 'none', cursor: 'pointer',
+          fontSize: '12px', fontFamily: "'Noto Sans JP',sans-serif", whiteSpace: 'nowrap',
           background: theme === key ? t.themeBtnActiveBg : t.themeBtnInactiveBg,
           color: theme === key ? t.themeBtnActiveText : t.themeBtnInactiveText,
           fontWeight: theme === key ? 600 : 400,
