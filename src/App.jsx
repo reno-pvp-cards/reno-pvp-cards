@@ -12,14 +12,29 @@ const PLAYSTYLE_LIST = ['ターゲッター', 'サポート重視', '火力重�
 const SNS_LIST = ['X', 'YouTube', 'Twitch']
 const RANK_LIST = ['アルテマ', 'オメガ', 'クリスタル', 'ダイヤモンド', 'プラチナ', 'ゴールド', 'シルバー', 'ブロンズ']
 const RANK_CONFIG = {
-  アルテマ:    { icon: '🌟' },
-  オメガ:      { icon: '⚡' },
-  クリスタル:  { icon: '💎' },
-  ダイヤモンド:{ icon: '🔷' },
-  プラチナ:    { icon: '🩶' },
-  ゴールド:    { icon: '🥇' },
-  シルバー:    { icon: '🥈' },
-  ブロンズ:    { icon: '🥉' },
+  アルテマ:    { icon: '🌟', fill: '#bd3636', top: '#d44f4f', right: '#982626', left: '#7c1d1d', stroke: '#e88282' },
+  オメガ:      { icon: '⚡', fill: '#a05aa0', top: '#b873b8', right: '#7e468e', left: '#683a74', stroke: '#cf9ccf' },
+  クリスタル:  { icon: '💎', fill: '#5a96b5', top: '#78b0c8', right: '#467a96', left: '#3a657d', stroke: '#a0c4d6' },
+  ダイヤモンド:{ icon: '🔷', fill: '#7e96a8', top: '#9fb6c4', right: '#5e7689', left: '#4a6072', stroke: '#bcccd6' },
+  プラチナ:    { icon: '🩶', fill: '#98a6b0', top: '#b8c4cc', right: '#7a8893', left: '#67737d', stroke: '#d2dce2' },
+  ゴールド:    { icon: '🥇', fill: '#c79e4a', top: '#dcbb6e', right: '#a17f30', left: '#856825', stroke: '#e6cd8e' },
+  シルバー:    { icon: '🥈', fill: '#b5b0a4', top: '#cecabd', right: '#928d82', left: '#7c776d', stroke: '#dcd8cd' },
+  ブロンズ:    { icon: '🥉', fill: '#b07a4e', top: '#c2956c', right: '#8e5f33', left: '#744d29', stroke: '#d2a87e' },
+}
+
+// ランクのダイヤ型アイコン（案B：ダイヤ全体をランク色で塗り分け）
+// size を指定すると正方形のSVGを返す。DOMプレビュー・フォームの両方で使用。
+function RankDiamond({ rank, size = 28 }) {
+  const c = RANK_CONFIG[rank]
+  if (!c) return null
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" style={{ display: 'block' }} aria-label={rank}>
+      <polygon points="24,4 44,20 24,44 4,20" fill={c.fill} stroke={c.stroke} strokeWidth="1.5" />
+      <polygon points="24,9 38,20 24,21 10,20" fill={c.top} />
+      <polygon points="24,21 38,20 24,39" fill={c.right} />
+      <polygon points="24,21 10,20 24,39" fill={c.left} />
+    </svg>
+  )
 }
 const DC_SERVERS = {
   Mana:      ['Anima', 'Asura', 'Chocobo', 'Hades', 'Ixion', 'Masamune', 'Pandemonium', 'Titan'],
@@ -252,7 +267,6 @@ function SectionLabel({ children, theme }) {
 function PlayerCard({ player, theme, cardRef }) {
   const t = THEME[theme]
   const rank = player.highestRank === '__none__' ? '' : player.highestRank
-  const rankCfg = RANK_CONFIG[rank]
   const ac = t.accentColor
 
   const sectionLabel = {
@@ -306,7 +320,7 @@ function PlayerCard({ player, theme, cardRef }) {
             border: `1px solid ${ac}66`, borderRadius: '10px', padding: '6px 10px',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', minWidth: '56px',
           }}>
-            <span style={{ fontSize: '20px', lineHeight: 1 }}>{rankCfg?.icon}</span>
+            <RankDiamond rank={rank} size={22} />
             <span style={{ fontSize: '11px', fontWeight: 700, color: ac, letterSpacing: '0.05em', fontFamily: "'Noto Sans JP',sans-serif", whiteSpace: 'nowrap' }}>{rank}</span>
           </div>
         )}
@@ -411,8 +425,15 @@ function PlayerForm({ onSubmit, theme, onToggleTheme, initialData }) {
     label: role, items: jobs.map(j => ({ label: j, value: j }))
   }))
   const rankOptions = [
-    ...RANK_LIST.map(r => ({ label: `${RANK_CONFIG[r].icon} ${r}`, value: r })),
-    { label: '🚫 ランク非表示', value: '__none__' },
+    ...RANK_LIST.map(r => ({
+      label: (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
+          <RankDiamond rank={r} size={16} />{r}
+        </span>
+      ),
+      value: r,
+    })),
+    { label: 'ランク非表示', value: '__none__' },
   ]
 
   return (
@@ -728,7 +749,29 @@ function CardView({ player, theme, onEdit }) {
       // ランクバッジ（DOM: top14, right14, padding 6px10px, minWidth56）
       if (rank) {
         roundRect(W - 84, 14, 70, 56, 10, t.rankBadgeBg, ac + '66')
-        txt(RANK_CONFIG[rank]?.icon || '', W - 49, 24, '22px serif', '#fff', 'center', 'top')
+        // ダイヤ型アイコン（案B・くすませて小さめ）：DOM の 22px に合わせて描画。中心 (W-49)
+        const rc = RANK_CONFIG[rank]
+        if (rc) {
+          const D = 22                    // アイコン描画サイズ
+          const ox = (W - 49) - D / 2     // 左上x
+          const oy = 22                   // 左上y（縮小分だけ下げて上下バランスを保つ）
+          const sc = D / 48               // viewBox48 → D へのスケール
+          const P = (x, y) => [ox + x * sc, oy + y * sc]
+          const poly = (pts, fill, stroke) => {
+            ctx.beginPath()
+            pts.forEach(([px, py], i) => {
+              const [cx, cy] = P(px, py)
+              if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy)
+            })
+            ctx.closePath()
+            if (fill) { ctx.fillStyle = fill; ctx.fill() }
+            if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1.5 * sc; ctx.stroke() }
+          }
+          poly([[24,4],[44,20],[24,44],[4,20]], rc.fill, rc.stroke)   // 外形
+          poly([[24,9],[38,20],[24,21],[10,20]], rc.top)              // 上面
+          poly([[24,21],[38,20],[24,39]], rc.right)                   // 右下
+          poly([[24,21],[10,20],[24,39]], rc.left)                    // 左下
+        }
         txt(rank, W - 49, 62, '700 11px "Noto Sans JP"', ac, 'center', 'alphabetic')
       }
 
