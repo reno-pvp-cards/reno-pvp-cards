@@ -625,7 +625,7 @@ function CardView({ player, theme, onEdit }) {
   const handlePostToX = useCallback(() => {
     const name = ((player.firstName || '') + ' ' + (player.lastName || '')).trim()
     const nameLine = name ? `${name}のCCキャラカードを作りました！\n` : 'CCキャラカードを作りました！\n'
-    const text = `${nameLine}\n#FF14 #CCキャラカード\nhttps://reno-pvp-cards.vercel.app`
+    const text = `${nameLine}\n#FF14 #CCキャラカード`
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }, [player])
